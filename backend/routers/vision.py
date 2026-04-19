@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models.db_models import VisionSession
 from models.schemas import VisionSessionCreate, VisionSessionOut, VisionStats
+from services.event_service import auto_create_events
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/vision", tags=["vision"])
@@ -39,6 +40,10 @@ async def create_session(
     await db.refresh(row)
     logger.info("Vision session saved: mode=%s risk=%s persons=%d",
                 row.mode, row.risk_level, row.person_count)
+    try:
+        await auto_create_events(db, row)
+    except Exception as _e:
+        logger.warning("Auto-create events failed (non-fatal): %s", _e)
     return row
 
 

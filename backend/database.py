@@ -27,7 +27,7 @@ class Base(DeclarativeBase):
 
 async def init_db() -> None:
     """建立所有資料表（首次啟動時呼叫，已存在則跳過）"""
-    from models.db_models import User, Report, RagDocument, SystemSettings, MqttDevice, MqttSensorReading, MqttAlertThreshold, EquipmentAlert, VhsReading, VisionSession, ChatHistory, TrainedModel  # noqa: F401
+    from models.db_models import User, Report, RagDocument, SystemSettings, MqttDevice, MqttSensorReading, MqttAlertThreshold, EquipmentAlert, VhsReading, VisionSession, ChatHistory, TrainedModel, FactoryEvent  # noqa: F401
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all, checkfirst=True)
 

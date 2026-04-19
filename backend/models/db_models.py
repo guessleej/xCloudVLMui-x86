@@ -241,6 +241,27 @@ class ChatHistory(Base):
     updated_at:   Mapped[datetime]       = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
 
+class FactoryEvent(Base):
+    """工廠事件紀錄（來自 VLM/YOLO 自動偵測或手動建立）"""
+    __tablename__ = "factory_events"
+
+    id:           Mapped[str]            = mapped_column(String(64),  primary_key=True, default=lambda: str(_uuid.uuid4()))
+    event_type:   Mapped[str]            = mapped_column(String(32),  nullable=False, index=True)   # detection|hazard|ppe_violation|equipment|system
+    severity:     Mapped[str]            = mapped_column(String(16),  nullable=False, index=True)   # critical|high|medium|low|info
+    title:        Mapped[str]            = mapped_column(String(256), nullable=False)
+    message:      Mapped[str]            = mapped_column(Text,        nullable=False)
+    source:       Mapped[str]            = mapped_column(String(32),  default="system")             # vlm|yolo|mqtt|system|manual
+    session_id:   Mapped[Optional[str]]  = mapped_column(String(64),  nullable=True, index=True)   # vision_sessions.id
+    equipment_id: Mapped[Optional[str]]  = mapped_column(String(64),  nullable=True, index=True)
+    location:     Mapped[Optional[str]]  = mapped_column(String(256), nullable=True)
+    extra:        Mapped[Optional[dict]] = mapped_column("event_meta", JSON, nullable=True)         # {detections, person_count, hazard_count, ...}
+    thumbnail:    Mapped[Optional[str]]  = mapped_column(Text,        nullable=True)                # base64 data URL
+    acknowledged: Mapped[bool]           = mapped_column(Boolean,     default=False, index=True)
+    resolved:     Mapped[bool]           = mapped_column(Boolean,     default=False, index=True)
+    resolved_at:  Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at:   Mapped[datetime]       = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+
 class TrainedModel(Base):
     """視覺推論模型登錄表（ONNX 模型管理）
 

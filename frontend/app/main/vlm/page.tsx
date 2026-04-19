@@ -230,6 +230,16 @@ export default function VlmPage() {
     // 即時推算風險
     const risk = inferRiskFromText(entry.result);
     setPreviewRisk(risk);
+    // 分析完成後自動填入知識庫查詢（取前 300 字）
+    const excerpt = entry.result
+      .replace(/#+\s*/g, "")
+      .replace(/\*\*/g, "")
+      .trim()
+      .slice(0, 300);
+    if (excerpt) {
+      setCompareQuery(excerpt);
+      setCompareResult(null);  // 清除舊結果
+    }
   }, []);
 
   /* ── 儲存為報告 ─────────────────────────────────────────────────── */
@@ -270,7 +280,10 @@ export default function VlmPage() {
   /* ── 知識庫比對 ─────────────────────────────────────────────────── */
   const handleCompare = async (queryOverride?: string) => {
     const q = (queryOverride ?? compareQuery).trim();
-    if (!q) return;
+    if (!q) {
+      toast.error("請輸入查詢內容，或點「使用最新分析結果」自動填入。");
+      return;
+    }
     if (queryOverride) setCompareQuery(queryOverride);
     setComparing(true);
     setCompareResult(null);
@@ -282,7 +295,14 @@ export default function VlmPage() {
         latency_ms: res.data.latency_ms,
       });
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "知識庫比對失敗");
+      const detail = err?.response?.data?.detail;
+      if (err?.response?.status === 503 || detail?.includes("無法連線")) {
+        toast.error("知識庫服務離線，請確認後端 LLM 服務已啟動。");
+      } else if (err?.response?.status === 404) {
+        toast.error("知識庫尚無文件，請先至「知識作業台」上傳維修手冊。");
+      } else {
+        toast.error(detail ?? "知識庫比對失敗，請稍後再試。");
+      }
     } finally {
       setComparing(false);
     }

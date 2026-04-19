@@ -34,6 +34,7 @@ from routers import (
     rag,           # backward-compat shim（/api/rag/*）
     vision as vision_router,
     models as models_router,
+    events as events_router,
 )
 from middleware.syslog_middleware import SyslogMiddleware
 from models.schemas import HealthResponse
@@ -81,6 +82,13 @@ async def lifespan(app: FastAPI):
             await seed_default_models(_mdb)
     except Exception as _me:
         logger.warning("Could not seed default models: %s", _me)
+
+    # ── 啟動時植入行為安全 SOP 知識文件至 ChromaDB ───────────────────────
+    try:
+        from services.behavior_seed import seed_behavior_knowledge
+        await seed_behavior_knowledge()
+    except Exception as _be:
+        logger.warning("Behavior seed failed (non-fatal): %s", _be)
 
     logger.info("ChromaDB ready: %s", settings.chroma_persist_dir)
     logger.info("LLM endpoint: %s", settings.llm_base_url)
@@ -197,6 +205,7 @@ app.include_router(mqtt_router.router)
 app.include_router(syslog_router.router)
 app.include_router(vision_router.router)   # /api/vision
 app.include_router(models_router.router)   # /api/models
+app.include_router(events_router.router)   # /api/events
 
 # ── Health Check ──────────────────────────────────────────────────────
 @app.get("/api/health", response_model=HealthResponse, tags=["system"])

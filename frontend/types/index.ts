@@ -328,3 +328,34 @@ export interface SysLogStats {
   recent_errors_24h:   number;
   recent_warnings_24h: number;
 }
+
+// ── Factory Events ────────────────────────────────────────────────────
+export type EventSeverity = "critical" | "high" | "medium" | "low" | "info";
+export type EventType = "detection" | "hazard" | "ppe_violation" | "equipment" | "system";
+
+export interface FactoryEvent {
+  id:           string;
+  event_type:   EventType;
+  severity:     EventSeverity;
+  title:        string;
+  message:      string;
+  source:       string;
+  session_id:   string | null;
+  equipment_id: string | null;
+  location:     string | null;
+  extra:        Record<string, unknown> | null;
+  thumbnail:    string | null;
+  acknowledged: boolean;
+  resolved:     boolean;
+  resolved_at:  string | null;
+  created_at:   string;
+}
+
+export interface EventStats {
+  total:        number;
+  unresolved:   number;
+  critical_24h: number;
+  high_24h:     number;
+  by_type:      Record<string, number>;
+  by_severity:  Record<string, number>;
+}

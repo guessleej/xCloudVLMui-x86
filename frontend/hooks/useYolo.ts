@@ -58,7 +58,9 @@ interface CocoClassMeta {
 
 export const COCO_CLASSES: CocoClassMeta[] = [
   // ── 人員 ──────────────────────────────────────────────────────────────
-  { zh: "人員",       en: "person",         risk: "critical", category: "personnel", confThresh: 0.25 }, // 0
+  // ⚠ risk: "warning"（非 critical）— 人員出現是正常工廠情境，屬於「需留意」而非「高危緊急」
+  // critical 升級條件由 VLM 或 Pose 模型判斷（PPE 缺失 / 危險姿態 / 進入禁區）
+  { zh: "人員",       en: "person",         risk: "warning",  category: "personnel", confThresh: 0.30 }, // 0
 
   // ── 車輛 ──────────────────────────────────────────────────────────────
   { zh: "自行車",     en: "bicycle",        risk: "warning",  category: "vehicle",   confThresh: 0.30 }, // 1

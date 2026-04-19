@@ -2,62 +2,89 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Activity,
-  AlertCircle,
   AlertTriangle,
   Bell,
   CheckCircle2,
-  ChevronDown,
-  ChevronRight,
-  Database,
+  Clock,
+  Cog,
+  Eye,
+  Filter,
   Info,
   Loader2,
   RefreshCw,
   Search,
   Server,
-  Settings,
-  Trash2,
-  Wifi,
+  Shield,
   X,
-  Zap,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { syslogApi } from "@/lib/api";
-import type { SysLog, SysLogStats } from "@/types";
+import { eventsApi } from "@/lib/api";
+import type { FactoryEvent, EventStats } from "@/types";
 
-// ── 等級設定 ──────────────────────────────────────────────────────────
-const LEVEL_META: Record<string, {
-  label: string;
-  icon: React.ElementType;
-  pill: string;
-  dot: string;
+// ── 嚴重度設定 ────────────────────────────────────────────────────────
+const SEVERITY_META: Record<string, {
+  label:  string;
+  pill:   string;
   border: string;
+  dot:    string;
+  text:   string;
 }> = {
-  INFO:     { label: "INFO",     icon: Info,         pill: "bg-sky-500/15 text-sky-300 border-sky-500/20",      dot: "bg-sky-400",    border: "border-l-sky-500/50" },
-  WARNING:  { label: "WARNING",  icon: AlertTriangle, pill: "bg-amber-500/15 text-amber-300 border-amber-500/20", dot: "bg-amber-400",  border: "border-l-amber-500" },
-  ERROR:    { label: "ERROR",    icon: AlertCircle,   pill: "bg-red-500/15 text-red-300 border-red-500/20",       dot: "bg-red-500",    border: "border-l-red-500" },
-  CRITICAL: { label: "CRITICAL", icon: Zap,           pill: "bg-rose-600/20 text-rose-300 border-rose-500/30",    dot: "bg-rose-500",   border: "border-l-rose-600" },
-  DEBUG:    { label: "DEBUG",    icon: Settings,      pill: "bg-slate-500/15 text-slate-400 border-slate-500/20", dot: "bg-slate-500",  border: "border-l-slate-500/50" },
+  critical: {
+    label:  "緊急",
+    pill:   "bg-rose-500/10 text-rose-300 border-rose-500/30",
+    border: "border-l-rose-500",
+    dot:    "bg-rose-500",
+    text:   "text-rose-300",
+  },
+  high: {
+    label:  "高",
+    pill:   "bg-amber-500/10 text-amber-300 border-amber-500/30",
+    border: "border-l-amber-500",
+    dot:    "bg-amber-500",
+    text:   "text-amber-300",
+  },
+  medium: {
+    label:  "中",
+    pill:   "bg-yellow-500/10 text-yellow-300 border-yellow-500/30",
+    border: "border-l-yellow-500",
+    dot:    "bg-yellow-500",
+    text:   "text-yellow-300",
+  },
+  low: {
+    label:  "低",
+    pill:   "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+    border: "border-l-emerald-500",
+    dot:    "bg-emerald-500",
+    text:   "text-emerald-300",
+  },
+  info: {
+    label:  "資訊",
+    pill:   "bg-sky-500/10 text-sky-300 border-sky-500/30",
+    border: "border-l-sky-500",
+    dot:    "bg-sky-400",
+    text:   "text-sky-300",
+  },
 };
 
-// ── 模組設定 ──────────────────────────────────────────────────────────
-const MODULE_META: Record<string, { label: string; icon: React.ElementType; color: string }> = {
-  mqtt:      { label: "MQTT",     icon: Wifi,         color: "text-emerald-400" },
-  rag:       { label: "RAG",      icon: Database,     color: "text-purple-400" },
-  report:    { label: "報告",     icon: CheckCircle2, color: "text-blue-400" },
-  settings:  { label: "設定",     icon: Settings,     color: "text-slate-400" },
-  auth:      { label: "認證",     icon: Server,       color: "text-orange-400" },
-  vlm:       { label: "VLM",      icon: Activity,     color: "text-cyan-400" },
-  dashboard: { label: "儀表板",   icon: Activity,     color: "text-brand-400" },
-  system:    { label: "系統",     icon: Server,       color: "text-slate-500" },
+// ── 事件類型設定 ──────────────────────────────────────────────────────
+const TYPE_META: Record<string, {
+  label: string;
+  icon:  React.ElementType;
+  color: string;
+}> = {
+  detection:     { label: "偵測",     icon: Eye,           color: "text-cyan-400" },
+  hazard:        { label: "危害",     icon: AlertTriangle, color: "text-amber-400" },
+  ppe_violation: { label: "PPE違規",  icon: Shield,        color: "text-rose-400" },
+  equipment:     { label: "設備",     icon: Cog,           color: "text-blue-400" },
+  system:        { label: "系統",     icon: Server,        color: "text-slate-400" },
 };
 
-function getModuleMeta(module: string) {
-  return MODULE_META[module.toLowerCase()] ?? { label: module, icon: Server, color: "text-slate-400" };
+function getTypeMeta(type: string) {
+  return TYPE_META[type] ?? { label: type, icon: Info, color: "text-slate-400" };
 }
 
-function getLevelMeta(level: string) {
-  return LEVEL_META[level.toUpperCase()] ?? LEVEL_META["INFO"];
+function getSeverityMeta(severity: string) {
+  return SEVERITY_META[severity] ?? SEVERITY_META["info"];
 }
 
 // ── 相對時間 ──────────────────────────────────────────────────────────
@@ -73,7 +100,7 @@ function formatTime(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleString("zh-TW", {
     month:  "2-digit", day:    "2-digit",
-    hour:   "2-digit", minute: "2-digit", second: "2-digit",
+    hour:   "2-digit", minute: "2-digit",
     hour12: false,
   });
 }
@@ -87,95 +114,6 @@ function StatCard({ label, value, sub, accent }: {
       <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">{label}</p>
       <p className={`mt-2 font-display text-2xl font-semibold ${accent ?? "text-white"}`}>{value}</p>
       {sub && <p className="mt-1 text-xs text-slate-500">{sub}</p>}
-    </div>
-  );
-}
-
-// ── 展開詳情 Row ──────────────────────────────────────────────────────
-function LogRow({ log }: { log: SysLog }) {
-  const [expanded, setExpanded] = useState(false);
-  const lm = getLevelMeta(log.level);
-  const mm = getModuleMeta(log.module);
-  const LIcon  = lm.icon;
-  const MIcon  = mm.icon;
-
-  return (
-    <div className={`border-l-2 ${lm.border} rounded-r-[14px] bg-white/[0.025] border border-l-[2px] border-white/[0.04] mb-1.5 overflow-hidden transition-colors hover:bg-white/[0.04]`}>
-      {/* Main row */}
-      <div
-        className="flex items-center gap-3 px-4 py-3 cursor-pointer"
-        onClick={() => setExpanded(v => !v)}
-      >
-        {/* Level icon */}
-        <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border ${lm.pill}`}>
-          <LIcon className="h-3.5 w-3.5" />
-        </div>
-
-        {/* Module badge */}
-        <div className="hidden sm:flex items-center gap-1.5 w-[90px] flex-shrink-0">
-          <MIcon className={`h-3 w-3 flex-shrink-0 ${mm.color}`} />
-          <span className="text-[11px] font-semibold text-slate-400 truncate">{mm.label}</span>
-        </div>
-
-        {/* Action */}
-        <code className="hidden md:block text-[11px] text-slate-500 w-[160px] flex-shrink-0 truncate font-mono">
-          {log.action}
-        </code>
-
-        {/* Message */}
-        <p className="flex-1 text-sm text-slate-300 truncate min-w-0">{log.message}</p>
-
-        {/* Status code */}
-        {log.status_code && (
-          <span className={`hidden lg:block flex-shrink-0 text-[11px] font-semibold ${
-            log.status_code >= 500 ? "text-red-400" :
-            log.status_code >= 400 ? "text-amber-400" : "text-slate-500"
-          }`}>
-            {log.status_code}
-          </span>
-        )}
-
-        {/* Duration */}
-        {log.duration_ms != null && (
-          <span className="hidden xl:block flex-shrink-0 text-[11px] text-slate-600 w-[56px] text-right">
-            {log.duration_ms.toFixed(0)}ms
-          </span>
-        )}
-
-        {/* Timestamp */}
-        <span className="flex-shrink-0 text-[11px] text-slate-600 w-[72px] text-right">
-          {relativeTime(log.timestamp)}
-        </span>
-
-        {/* Expand */}
-        <ChevronRight className={`h-3.5 w-3.5 text-slate-600 flex-shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`} />
-      </div>
-
-      {/* Detail panel */}
-      {expanded && (
-        <div className="border-t border-white/8 bg-slate-950/40 px-4 py-3 text-xs text-slate-400 space-y-2">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div><span className="text-slate-600">時間：</span><span className="text-slate-300">{formatTime(log.timestamp)}</span></div>
-            <div><span className="text-slate-600">模組：</span><span className="text-slate-300">{log.module}</span></div>
-            <div><span className="text-slate-600">動作：</span><code className="text-slate-300 font-mono">{log.action}</code></div>
-            {log.ip_address && <div><span className="text-slate-600">IP：</span><span className="text-slate-300">{log.ip_address}</span></div>}
-            {log.status_code && <div><span className="text-slate-600">狀態碼：</span><span className="text-slate-300">{log.status_code}</span></div>}
-            {log.duration_ms != null && <div><span className="text-slate-600">回應時間：</span><span className="text-slate-300">{log.duration_ms.toFixed(2)} ms</span></div>}
-            {log.user_id && <div><span className="text-slate-600">使用者：</span><span className="text-slate-300">{log.user_id}</span></div>}
-          </div>
-          {log.detail && (
-            <div>
-              <p className="mb-1 text-slate-600">Detail：</p>
-              <pre className="rounded-[8px] bg-slate-950/60 px-3 py-2 text-[11px] text-slate-300 overflow-x-auto font-mono leading-relaxed">
-                {(() => {
-                  try { return JSON.stringify(JSON.parse(log.detail!), null, 2); }
-                  catch { return log.detail; }
-                })()}
-              </pre>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -200,36 +138,167 @@ function FilterPill({
   );
 }
 
-// ── 主頁面 ────────────────────────────────────────────────────────────
-const LEVELS  = ["ALL", "INFO", "WARNING", "ERROR", "CRITICAL"];
-const MODULES = ["ALL", "mqtt", "rag", "report", "settings", "auth", "vlm", "system"];
+// ── 事件卡片 ──────────────────────────────────────────────────────────
+function EventCard({
+  event,
+  onAcknowledge,
+  onResolve,
+}: {
+  event:        FactoryEvent;
+  onAcknowledge: (id: string) => void;
+  onResolve:    (id: string) => void;
+}) {
+  const sm = getSeverityMeta(event.severity);
+  const tm = getTypeMeta(event.event_type);
+  const TypeIcon = tm.icon;
+  const [showThumb, setShowThumb] = useState(false);
+
+  return (
+    <div
+      className={`border-l-2 ${sm.border} rounded-r-[14px] border border-l-[2px] border-white/[0.06] mb-2 overflow-hidden transition-colors ${
+        event.resolved ? "opacity-60" : "hover:bg-white/[0.03]"
+      } bg-white/[0.025]`}
+    >
+      <div className="flex items-start gap-3 px-4 py-3">
+
+        {/* Severity dot + type icon */}
+        <div className="flex flex-col items-center gap-1.5 pt-0.5 flex-shrink-0">
+          <div className={`h-2.5 w-2.5 rounded-full ${sm.dot} ${event.resolved ? "opacity-40" : "animate-pulse''"}`} />
+          <div className={`flex h-7 w-7 items-center justify-center rounded-lg border ${sm.pill}`}>
+            <TypeIcon className="h-3.5 w-3.5" />
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            {/* Severity badge */}
+            <span className={`inline-flex items-center rounded-[6px] border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${sm.pill}`}>
+              {sm.label}
+            </span>
+            {/* Type badge */}
+            <span className={`text-[11px] font-semibold ${tm.color}`}>{tm.label}</span>
+            {/* Source */}
+            <span className="text-[10px] text-slate-600 uppercase tracking-wide">{event.source}</span>
+            {/* Acknowledged badge */}
+            {event.acknowledged && !event.resolved && (
+              <span className="inline-flex items-center gap-1 rounded-[6px] border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-300">
+                <CheckCircle2 className="h-3 w-3" />已確認
+              </span>
+            )}
+            {/* Resolved badge */}
+            {event.resolved && (
+              <span className="inline-flex items-center gap-1 rounded-[6px] border border-slate-500/30 bg-slate-500/10 px-2 py-0.5 text-[10px] text-slate-400">
+                <CheckCircle2 className="h-3 w-3" />已解決
+              </span>
+            )}
+          </div>
+
+          <h3 className={`text-sm font-semibold ${event.resolved ? "text-slate-400" : "text-white"} leading-snug`}>
+            {event.title}
+          </h3>
+          <p className="mt-0.5 text-xs text-slate-400 leading-relaxed line-clamp-2">
+            {event.message}
+          </p>
+
+          {/* Meta row */}
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-600">
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {formatTime(event.created_at)}
+              <span className="text-slate-700">（{relativeTime(event.created_at)}）</span>
+            </span>
+            {event.location && (
+              <span>📍 {event.location}</span>
+            )}
+            {event.session_id && (
+              <span className="font-mono text-slate-700 truncate max-w-[120px]">
+                session: {event.session_id.slice(0, 8)}…
+              </span>
+            )}
+            {event.thumbnail && (
+              <button
+                onClick={() => setShowThumb(v => !v)}
+                className="text-sky-500 hover:text-sky-400 underline"
+              >
+                {showThumb ? "隱藏截圖" : "查看截圖"}
+              </button>
+            )}
+          </div>
+
+          {/* Thumbnail */}
+          {showThumb && event.thumbnail && (
+            <div className="mt-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={event.thumbnail}
+                alt="事件截圖"
+                className="max-h-40 rounded-[10px] border border-white/10 object-contain"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        {!event.resolved && (
+          <div className="flex flex-col gap-1.5 flex-shrink-0">
+            {!event.acknowledged && (
+              <button
+                onClick={() => onAcknowledge(event.id)}
+                title="確認事件"
+                className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-white/10 bg-white/[0.04] text-slate-400 transition hover:border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-300"
+              >
+                <Bell className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <button
+              onClick={() => onResolve(event.id)}
+              title="標記已解決"
+              className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-white/10 bg-white/[0.04] text-slate-400 transition hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-300"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+// ── 常數 ──────────────────────────────────────────────────────────────
+const SEVERITIES = ["ALL", "critical", "high", "medium", "low", "info"];
+const EVENT_TYPES = ["ALL", "detection", "hazard", "ppe_violation", "equipment", "system"];
 const TIME_RANGES = [
-  { label: "最近 1 小時", h: 1 },
-  { label: "最近 24 小時", h: 24 },
-  { label: "最近 7 天", h: 168 },
-  { label: "全部", h: undefined },
+  { label: "1 小時", h: 1 },
+  { label: "24 小時", h: 24 },
+  { label: "7 天", h: 168 },
+  { label: "全部", h: undefined as number | undefined },
 ];
 
-export default function EventsPage() {
-  const [logs,        setLogs]        = useState<SysLog[]>([]);
-  const [stats,       setStats]       = useState<SysLogStats | null>(null);
+const SEVERITY_PILL_ACTIVE: Record<string, string> = {
+  critical: "border-rose-500/50 bg-rose-500/15 text-rose-200",
+  high:     "border-amber-500/50 bg-amber-500/15 text-amber-200",
+  medium:   "border-yellow-500/50 bg-yellow-500/15 text-yellow-200",
+  low:      "border-emerald-500/50 bg-emerald-500/15 text-emerald-200",
+  info:     "border-sky-500/50 bg-sky-500/15 text-sky-200",
+};
+
+// ── 主頁面 ────────────────────────────────────────────────────────────
+export default function FactoryEventsPage() {
+  const [events,      setEvents]      = useState<FactoryEvent[]>([]);
+  const [stats,       setStats]       = useState<EventStats | null>(null);
   const [loading,     setLoading]     = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Filters
-  const [level,   setLevel]   = useState("ALL");
-  const [module,  setModule]  = useState("ALL");
-  const [search,  setSearch]  = useState("");
-  const [sinceH,  setSinceH]  = useState<number | undefined>(24);
-  const [limit,   setLimit]   = useState(200);
-
-  // Clear dialog
-  const [showClear, setShowClear] = useState(false);
-  const [clearDays, setClearDays] = useState(30);
-  const [clearing,  setClearing]  = useState(false);
-
-  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [severity,    setSeverity]    = useState("ALL");
+  const [eventType,   setEventType]   = useState("ALL");
+  const [resolved,    setResolved]    = useState<boolean | undefined>(false);
+  const [sinceH,      setSinceH]      = useState<number | undefined>(24);
+  const [search,      setSearch]      = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounce search input
   useEffect(() => {
@@ -242,55 +311,65 @@ export default function EventsPage() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [logsRes, statsRes] = await Promise.all([
-        syslogApi.list({
-          level:   level   !== "ALL" ? level   : undefined,
-          module:  module  !== "ALL" ? module  : undefined,
-          search:  search  || undefined,
-          since_h: sinceH,
-          limit,
+      const [evRes, stRes] = await Promise.all([
+        eventsApi.list({
+          severity:   severity   !== "ALL" ? severity   : undefined,
+          event_type: eventType  !== "ALL" ? eventType  : undefined,
+          resolved:   resolved,
+          since_h:    sinceH,
+          limit:      200,
         }),
-        syslogApi.stats(),
+        eventsApi.stats(),
       ]);
-      setLogs(logsRes.data);
-      setStats(statsRes.data);
+      // Client-side search filter
+      let data: FactoryEvent[] = evRes.data;
+      if (search) {
+        const q = search.toLowerCase();
+        data = data.filter(e =>
+          e.title.toLowerCase().includes(q) ||
+          e.message.toLowerCase().includes(q) ||
+          e.source.toLowerCase().includes(q)
+        );
+      }
+      setEvents(data);
+      setStats(stRes.data);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
       toast.error("載入失敗：" + (e?.response?.data?.detail ?? e?.message ?? "未知錯誤"));
     } finally {
       setLoading(false);
     }
-  }, [level, module, search, sinceH, limit]);
+  }, [severity, eventType, resolved, sinceH, search]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // Auto-refresh every 10s
+  // Auto-refresh every 15s
   useEffect(() => {
     if (!autoRefresh) return;
-    const id = setInterval(fetchAll, 10_000);
+    const id = setInterval(fetchAll, 15_000);
     return () => clearInterval(id);
   }, [autoRefresh, fetchAll]);
 
-  const handleClear = async () => {
-    setClearing(true);
+  const handleAcknowledge = async (id: string) => {
     try {
-      await syslogApi.clear(clearDays);
-      toast.success(`已清除 ${clearDays} 天前的日誌`);
-      setShowClear(false);
+      await eventsApi.acknowledge(id);
+      toast.success("事件已確認");
       fetchAll();
-    } catch {
-      toast.error("清除失敗");
-    } finally {
-      setClearing(false);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      toast.error("確認失敗：" + (e?.response?.data?.detail ?? "未知錯誤"));
     }
   };
 
-  // Level color pills for stats
-  const levelPillClass: Record<string, string> = {
-    INFO:     "text-sky-300",
-    WARNING:  "text-amber-300",
-    ERROR:    "text-red-400",
-    CRITICAL: "text-rose-400",
+  const handleResolve = async (id: string) => {
+    try {
+      await eventsApi.resolve(id);
+      toast.success("事件已標記解決");
+      fetchAll();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      toast.error("解決失敗：" + (e?.response?.data?.detail ?? "未知錯誤"));
+    }
   };
 
   return (
@@ -301,26 +380,22 @@ export default function EventsPage() {
         <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-brand-500/30 bg-brand-500/15">
-              <Bell className="h-5 w-5 text-brand-300" />
+              <AlertTriangle className="h-5 w-5 text-brand-300" />
             </div>
             <div>
-              <div className="section-kicker">System Events</div>
-              <h1 className="display-title mt-0.5 text-xl sm:text-2xl">事件中心</h1>
+              <div className="section-kicker">Factory Events</div>
+              <h1 className="display-title mt-0.5 text-xl sm:text-2xl">工廠事件</h1>
             </div>
             {stats && (
               <div className="hidden items-center gap-2 xl:flex">
-                <span className="signal-chip">
-                  <Database className="h-3.5 w-3.5 text-slate-400" />
-                  共 {stats.total.toLocaleString()} 筆
-                </span>
-                {stats.recent_errors_24h > 0 && (
+                {stats.unresolved > 0 && (
                   <span className="status-pill status-pill-danger">
-                    {stats.recent_errors_24h} 錯誤（24h）
+                    {stats.unresolved} 未解決
                   </span>
                 )}
-                {stats.recent_warnings_24h > 0 && (
-                  <span className="status-pill status-pill-warn">
-                    {stats.recent_warnings_24h} 警告（24h）
+                {stats.critical_24h > 0 && (
+                  <span className="status-pill status-pill-danger">
+                    {stats.critical_24h} 緊急（24h）
                   </span>
                 )}
               </div>
@@ -333,26 +408,41 @@ export default function EventsPage() {
               className={`secondary-button ${autoRefresh ? "border-brand-500/50 bg-brand-500/15 text-brand-200" : ""}`}
             >
               <RefreshCw className={`h-4 w-4 ${autoRefresh ? "animate-spin" : ""}`} />
-              {autoRefresh ? "自動刷新中" : "手動模式"}
+              {autoRefresh ? "自動刷新" : "手動模式"}
             </button>
             <button onClick={fetchAll} disabled={loading} className="secondary-button">
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               刷新
             </button>
-            <button onClick={() => setShowClear(true)} className="secondary-button text-slate-500 hover:text-red-400">
-              <Trash2 className="h-4 w-4" />
-              清除日誌
-            </button>
           </div>
         </div>
 
-        {/* Stats */}
+        {/* Stats bar */}
         {stats && (
           <div className="relative z-10 mt-4 grid grid-cols-2 gap-3 border-t border-white/8 pt-4 sm:grid-cols-4">
-            <StatCard label="總日誌筆數"  value={stats.total.toLocaleString()} sub="資料庫累計" />
-            <StatCard label="錯誤（24h）" value={stats.recent_errors_24h}   sub="ERROR + CRITICAL" accent={stats.recent_errors_24h > 0 ? "text-red-400" : "text-white"} />
-            <StatCard label="警告（24h）" value={stats.recent_warnings_24h} sub="WARNING"          accent={stats.recent_warnings_24h > 0 ? "text-amber-400" : "text-white"} />
-            <StatCard label="目前顯示"   value={logs.length}               sub={`限制 ${limit} 筆`} />
+            <StatCard
+              label="事件總數"
+              value={stats.total.toLocaleString()}
+              sub="資料庫累計"
+            />
+            <StatCard
+              label="未解決"
+              value={stats.unresolved}
+              sub="待處理"
+              accent={stats.unresolved > 0 ? "text-amber-400" : "text-white"}
+            />
+            <StatCard
+              label="緊急（24h）"
+              value={stats.critical_24h}
+              sub="critical severity"
+              accent={stats.critical_24h > 0 ? "text-rose-400" : "text-white"}
+            />
+            <StatCard
+              label="高風險（24h）"
+              value={stats.high_24h}
+              sub="high severity"
+              accent={stats.high_24h > 0 ? "text-amber-400" : "text-white"}
+            />
           </div>
         )}
       </section>
@@ -362,58 +452,69 @@ export default function EventsPage() {
         <div className="flex flex-wrap items-center gap-3">
 
           {/* Search */}
-          <div className="relative min-w-[220px] flex-1">
+          <div className="relative min-w-[200px] flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
             <input
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
-              placeholder="關鍵字搜尋訊息…"
+              placeholder="搜尋標題、訊息…"
               className="w-full rounded-[12px] border border-white/10 bg-slate-950/50 py-2 pl-9 pr-3.5 text-sm text-white placeholder-slate-600 outline-none focus:border-brand-500/50"
             />
             {searchInput && (
-              <button onClick={() => setSearchInput("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+              <button
+                onClick={() => setSearchInput("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              >
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
 
-          {/* Level */}
+          {/* Severity filter */}
           <div className="flex flex-wrap gap-1.5">
-            {LEVELS.map(l => (
+            {SEVERITIES.map(s => (
               <FilterPill
-                key={l}
-                active={level === l}
-                onClick={() => setLevel(l)}
-                color={l !== "ALL" ? (
-                  l === "INFO"     ? "border-sky-500/50 bg-sky-500/15 text-sky-200" :
-                  l === "WARNING"  ? "border-amber-500/50 bg-amber-500/15 text-amber-200" :
-                  l === "ERROR"    ? "border-red-500/50 bg-red-500/15 text-red-200" :
-                  "border-rose-500/50 bg-rose-600/15 text-rose-200"
-                ) : undefined}
+                key={s}
+                active={severity === s}
+                onClick={() => setSeverity(s)}
+                color={s !== "ALL" ? SEVERITY_PILL_ACTIVE[s] : undefined}
               >
-                {l === "ALL" ? "全部等級" : l}
+                {s === "ALL" ? "全部嚴重度" : getSeverityMeta(s).label}
               </FilterPill>
             ))}
           </div>
 
-          {/* Module */}
+          {/* Type filter */}
           <div className="flex items-center gap-1.5">
+            <Filter className="h-3.5 w-3.5 text-slate-500" />
             <select
-              value={module}
-              onChange={e => setModule(e.target.value)}
+              value={eventType}
+              onChange={e => setEventType(e.target.value)}
               className="rounded-[12px] border border-white/10 bg-slate-950/60 px-3 py-2 text-xs font-semibold text-slate-300 outline-none focus:border-brand-500/50"
             >
-              {MODULES.map(m => (
-                <option key={m} value={m}>
-                  {m === "ALL" ? "全部模組" : (MODULE_META[m]?.label ?? m)}
+              {EVENT_TYPES.map(t => (
+                <option key={t} value={t}>
+                  {t === "ALL" ? "全部類型" : (TYPE_META[t]?.label ?? t)}
                 </option>
               ))}
             </select>
           </div>
 
+          {/* Resolved toggle */}
+          <div className="flex gap-1.5">
+            <FilterPill active={resolved === false} onClick={() => setResolved(false)}>
+              未解決
+            </FilterPill>
+            <FilterPill active={resolved === true} onClick={() => setResolved(true)}>
+              已解決
+            </FilterPill>
+            <FilterPill active={resolved === undefined} onClick={() => setResolved(undefined)}>
+              全部
+            </FilterPill>
+          </div>
+
           {/* Time range */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex gap-1.5">
             {TIME_RANGES.map(r => (
               <FilterPill
                 key={r.label}
@@ -428,132 +529,67 @@ export default function EventsPage() {
         </div>
       </section>
 
-      {/* ── Module Stats ──────────────────────────────────────── */}
-      {stats && Object.keys(stats.by_module).length > 0 && (
-        <section className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
-          {Object.entries(stats.by_module)
+      {/* ── Type Stats ────────────────────────────────────────── */}
+      {stats && Object.keys(stats.by_type).length > 0 && (
+        <section className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          {Object.entries(stats.by_type)
             .sort(([, a], [, b]) => b - a)
-            .map(([mod, count]) => {
-              const m = getModuleMeta(mod);
-              const MIcon = m.icon;
+            .map(([type, count]) => {
+              const tm = getTypeMeta(type);
+              const TIcon = tm.icon;
               return (
                 <button
-                  key={mod}
-                  onClick={() => setModule(module === mod ? "ALL" : mod)}
+                  key={type}
+                  onClick={() => setEventType(eventType === type ? "ALL" : type)}
                   className={`rounded-[16px] border px-3 py-2.5 text-left transition-all ${
-                    module === mod
+                    eventType === type
                       ? "border-brand-500/40 bg-brand-500/10"
                       : "border-white/8 bg-white/[0.025] hover:bg-white/[0.05]"
                   }`}
                 >
-                  <MIcon className={`h-3.5 w-3.5 ${m.color} mb-1`} />
+                  <TIcon className={`h-3.5 w-3.5 ${tm.color} mb-1`} />
                   <p className="text-base font-semibold text-white">{count}</p>
-                  <p className="text-[10px] text-slate-500">{m.label}</p>
+                  <p className="text-[10px] text-slate-500">{tm.label}</p>
                 </button>
               );
             })}
         </section>
       )}
 
-      {/* ── Log List ─────────────────────────────────────────── */}
+      {/* ── Event List ───────────────────────────────────────── */}
       <section>
         <div className="mb-3 flex items-center justify-between px-1">
           <h2 className="text-sm font-semibold text-white">
-            日誌列表
+            事件列表
             <span className="ml-2 text-xs font-normal text-slate-500">
-              ({logs.length} 筆{loading ? "，更新中…" : ""})
+              ({events.length} 筆{loading ? "，更新中…" : ""})
             </span>
           </h2>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-600">顯示筆數：</span>
-            {[100, 200, 500].map(n => (
-              <FilterPill key={n} active={limit === n} onClick={() => setLimit(n)}>
-                {n}
-              </FilterPill>
-            ))}
-          </div>
         </div>
 
-        {loading && logs.length === 0 ? (
+        {loading && events.length === 0 ? (
           <div className="panel-soft flex items-center justify-center rounded-[28px] py-20">
             <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
           </div>
-        ) : logs.length === 0 ? (
+        ) : events.length === 0 ? (
           <div className="panel-soft flex flex-col items-center rounded-[28px] py-16 text-center">
-            <Bell className="h-10 w-10 text-slate-600" />
-            <p className="mt-4 text-base font-semibold text-white">尚無符合條件的日誌</p>
-            <p className="mt-2 text-sm text-slate-500">調整篩選條件，或等待系統產生新事件</p>
+            <Info className="h-10 w-10 text-slate-600" />
+            <p className="mt-4 text-base font-semibold text-white">暫無事件記錄</p>
+            <p className="mt-2 text-sm text-slate-500">目前沒有符合篩選條件的事件，系統持續自動偵測中</p>
           </div>
         ) : (
           <div>
-            {/* Column header */}
-            <div className="mb-2 flex items-center gap-3 px-4 text-[10px] uppercase tracking-[0.18em] text-slate-600">
-              <span className="w-7 flex-shrink-0">等級</span>
-              <span className="hidden sm:block w-[90px] flex-shrink-0">模組</span>
-              <span className="hidden md:block w-[160px] flex-shrink-0">動作</span>
-              <span className="flex-1">訊息</span>
-              <span className="hidden lg:block flex-shrink-0 w-[36px] text-right">狀態</span>
-              <span className="hidden xl:block flex-shrink-0 w-[56px] text-right">時間</span>
-              <span className="flex-shrink-0 w-[72px] text-right">相對</span>
-              <span className="w-3.5 flex-shrink-0" />
-            </div>
-            {logs.map(log => (
-              <LogRow key={log.id} log={log} />
+            {events.map(event => (
+              <EventCard
+                key={event.id}
+                event={event}
+                onAcknowledge={handleAcknowledge}
+                onResolve={handleResolve}
+              />
             ))}
           </div>
         )}
       </section>
-
-      {/* ── Clear Dialog ─────────────────────────────────────── */}
-      {showClear && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="panel-soft w-full max-w-sm rounded-[28px] p-6">
-            <div className="flex items-center justify-between gap-3 border-b border-white/8 pb-4">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Purge Logs</p>
-                <h2 className="mt-1 text-lg font-semibold text-white">清除過期日誌</h2>
-              </div>
-              <button onClick={() => setShowClear(false)}
-                className="ghost-button h-8 w-8 rounded-xl px-0 text-slate-500">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mt-5">
-              <label className="mb-2 block text-sm text-slate-400">
-                清除幾天前的日誌？
-              </label>
-              <div className="flex gap-2">
-                {[7, 14, 30, 60, 90].map(d => (
-                  <button
-                    key={d}
-                    onClick={() => setClearDays(d)}
-                    className={`flex-1 rounded-[10px] border py-2 text-xs font-semibold transition-all ${
-                      clearDays === d
-                        ? "border-red-500/50 bg-red-500/15 text-red-300"
-                        : "border-white/10 bg-white/[0.04] text-slate-400 hover:border-white/20"
-                    }`}
-                  >
-                    {d}天
-                  </button>
-                ))}
-              </div>
-              <p className="mt-3 text-xs text-slate-500">
-                將永久刪除 <span className="font-semibold text-red-400">{clearDays} 天前</span>的所有日誌，此操作無法復原。
-              </p>
-            </div>
-            <div className="mt-6 flex gap-3">
-              <button onClick={() => setShowClear(false)} className="secondary-button flex-1">取消</button>
-              <button
-                onClick={handleClear}
-                disabled={clearing}
-                className="flex-1 rounded-[14px] bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
-              >
-                {clearing ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "確認清除"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

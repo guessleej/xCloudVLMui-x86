@@ -46,6 +46,9 @@ import toast from "react-hot-toast";
 import { vlmApi, getVlmWsUrl, modelsApi } from "@/lib/api";
 import { useYolo, type YoloDetection, calcManufacturingStats } from "@/hooks/useYolo";
 import { useYoloPose, type PoseDetection, drawPoseOverlay, poseToDbFormat } from "@/hooks/useYoloPose";
+import { useYoloSegment, type SegmentDetection } from "@/hooks/useYoloSegment";
+import { useYoloClassify, type ClassifyResult } from "@/hooks/useYoloClassify";
+import { useBehaviorDetector, type BehaviorAlert } from "@/hooks/useBehaviorDetector";
 import { SortTracker, type TrackedObject, drawTrackIds } from "@/lib/yoloTracker";
 import type { TrainedModel } from "@/types";
 
@@ -278,47 +281,64 @@ COMPLIANCE 存放合規評估：
 4. FIFO/FEFO 是否可判斷（先進先出/先到期先使用）
 5. 是否有不相容物品混放風險（如：氧化劑與可燃物）`,
   },
-];
 
-  // ── AUTO 統一全模式（合併四種模式）──
+  // ── AUTO 統一全模式（合併四種模式：Equipment + People + Events + Objects）──
+  // YOLO 後端：detect (YOLO26n COCO-80) + pose (YOLO26n-Pose COCO-17kp) 同時並行
+  // VLM 提示：整合四種專業角色，單次推論涵蓋所有維度
   {
     key:     "auto",
     label:   "統一全模式",
     labelEn: "AUTO",
     icon:    <Cpu className="h-3.5 w-3.5" />,
     color:   "rose",
-    prompt: `你是資深工廠視覺 AI 分析師，同時具備設備診斷、工安合規、事件識別與物料管理四項專業能力。
-請對影像執行**全面統一分析**，涵蓋所有可見元素：設備、人員、事件、物品。
+    prompt: `你是資深工廠視覺 AI 分析師，同時具備以下四項專業能力：
+① 工業設備診斷工程師（ISO 13374 狀態監測）
+② 工業安全衛生工程師（ISO 45001 / OSHA）
+③ 工廠事件分析師與緊急應變專家
+④ 物料管理與品質工程師（5S / GHS）
+
+請對影像執行**全面統一分析**，涵蓋所有可見元素。
+
+【YOLO 偵測背景資訊】（由前端 YOLO26n E2E 即時偵測提供參考）：
+- detect 模型：YOLO26n COCO-80（設備/車輛/工具/物品/人員偵測）
+- pose 模型：YOLO26n-Pose COCO-17kp（人員姿態 17 關鍵點骨架）
+- 偵測類別含：person, car, truck, knife, scissors, bottle, laptop, cell phone 等
+- 請結合 YOLO 偵測框與影像內容進行更精確的工業場景分析
 
 【全域偵測清單】每個可見元素各佔一行（必須先輸出此區塊）：
 DETECT: [名稱/描述] | POS: [left/center/right] | VERT: [top/middle/bottom] | STATUS: [ok/warning/critical] | CONF: [high/medium/low] | CATEGORY: [equipment/person/event/object/hazard/environment]
 
 CATEGORY 分類：
-  equipment   = 機械/電氣/管路/結構等工業設備元件
-  person      = 作業人員（含 PPE 狀態）
-  event       = 正在發生的事件或異常活動
+  equipment   = 機械/電氣/管路/結構/儀表等工業設備元件
+  person      = 作業人員（含 PPE：安全帽/反光背心/手套/安全鞋/護目鏡狀態）
+  event       = 正在發生的事件或異常活動（near-miss/violation/emergency）
   object      = 物料/工具/成品/廢料等可識別物品
-  hazard      = 危害源（危險物品/暴露能量/不安全狀態）
-  environment = 場景/環境元素（地板/照明/通道/空間）
+  hazard      = 危害源（危險物品/GHS 化學品/暴露能量/不安全狀態）
+  environment = 場景/環境元素（地板/照明/通道/空間/5S 狀態）
 
-【設備健康評分】（若影像含設備則必須輸出）：
+【設備健康評分】（若影像含工業設備則必須輸出）：
 VHS: [0–100整數] | REASON: [主要扣分因素，不超過20字]
+VHS 參考：90–100=優良 / 70–89=輕度老化 / 50–69=需監控 / 30–49=高風險 / 0–29=立即停機
 
-【5S 評分】（若影像含工作場所則必須輸出）：
+【人員工安評估】（若影像含人員則必須輸出）：
+PPE: 合規人數=[N] | 違規人數=[N] | 缺失項目=[安全帽/背心/手套/等] | 姿勢風險=[none/ergonomic/danger]
+POSTURE 參考：YOLO26n-Pose 已提供 17 關鍵點（鼻/眼/耳/肩/肘/腕/髖/膝/踝）可輔助判斷彎腰/過伸/扭轉風險
+
+【5S 審計評分】（若影像含工作場所則必須輸出）：
 5S: 整理=[1-5] | 整頓=[1-5] | 清掃=[1-5] | 清潔=[1-5] | 素養=[1-5] | 總分=[5-25] | 等級=[優/良/中/差]
 
 【環境安全評估】（必須輸出此行）：
-ENV: [場景類型] | LIGHT: [good/poor/hazard] | FLOOR: [clear/wet/cluttered/hazard] | RISK: [low/medium/high/critical] | ACTIVITY: [正在進行的活動] | COUNT: [人數]
+ENV: [場景類型] | LIGHT: [good/poor/hazard] | FLOOR: [clear/wet/cluttered/hazard] | RISK: [low/medium/high/critical] | ACTIVITY: [正在進行的活動] | COUNT: [人數] | ZONE: [general/restricted/permit-required]
 
 【風險矩陣評估】（必須輸出此行）：
 RISK_MATRIX: 發生可能性=[很低/低/中/高/很高] | 影響嚴重度=[輕微/中等/嚴重/極嚴重/災難性] | 風險等級=[可接受/需監控/不可接受/禁止作業]
 
 【全面診斷摘要】4–6 句，依序包含：
-1. 最高風險項目（設備故障/人員安全/事件/危害物品）
-2. PPE 合規狀態（若有人員）
-3. 環境危害因子與 5S 主要缺失
-4. 立即處置建議（按優先順序）
-5. 預防性維護與系統改善建議`,
+1. 最高風險項目（設備故障/人員安全/危害事件/GHS 危險物品）及其失效模式
+2. PPE 合規狀態與具體缺失項目（若有人員）
+3. 環境危害因子、5S 主要缺失與根本原因
+4. 立即處置建議（依優先順序：停機/疏散/隔離/急救/通報）
+5. 預防性維護與系統改善建議（含 ISO 法規條款如適用）`,
   },
 ];
 
@@ -899,8 +919,13 @@ export default function CameraStream({
 }: CameraStreamProps) {
 
   /* ── YOLO Hooks（多任務）────────────────────────────────────────── */
-  const yolo     = useYolo();        // 偵測模型：Equipment / Events / Objects
-  const yoloPose = useYoloPose();    // 姿態模型：People
+  const yolo         = useYolo();           // 偵測模型：COCO-80 物件偵測
+  const yoloPose     = useYoloPose();       // 姿態模型：17 關鍵點骨架
+  const yoloSegment  = useYoloSegment();    // 分割模型：實例分割（Segment）
+  const yoloClassify = useYoloClassify();   // 分類模型：場景分類（Classify）
+
+  /* ── 行為偵測 Hook ────────────────────────────────────────────── */
+  const behaviorDetector = useBehaviorDetector();
 
   /* ── SORT 追蹤器（Events 模式）──────────────────────────────────── */
   const sortTrackerRef = useRef(new SortTracker({ maxAge: 5, iouThreshold: 0.25 }));
@@ -948,6 +973,15 @@ export default function CameraStream({
   const yoloRafRef          = useRef<number | null>(null);
   const yoloFpsCountRef     = useRef({ count: 0, ts: 0 });
 
+  /* ── 行為偵測狀態 ─────────────────────────────────────────────────── */
+  const [behaviorAlerts,    setBehaviorAlerts]    = useState<BehaviorAlert[]>([]);
+
+  /* ── 場景分類結果 ─────────────────────────────────────────────────── */
+  const [sceneClasses,      setSceneClasses]      = useState<ClassifyResult[]>([]);
+
+  /* ── 實例分割結果 ─────────────────────────────────────────────────── */
+  const [segDetections,     setSegDetections]     = useState<SegmentDetection[]>([]);
+
   /* ── 自動模式 ─────────────────────────────────────────────────────── */
   const [autoMode,          setAutoMode]          = useState(false);
   const [intervalSec,       setIntervalSec]       = useState(5);
@@ -991,7 +1025,7 @@ export default function CameraStream({
   /** 分析完成後自動儲存 YOLO+VLM 合併結果至 DB（靜默失敗，不影響主功能）*/
   const saveSessionToDb = useCallback(async (entry: AnalysisEntry) => {
     try {
-      const mode    = activeModeRef.current;
+      const mode    = "auto";             // 永遠是 AUTO 統一全模式
       const dets    = yoloDetectionsRef.current;
       const stats   = calcManufacturingStats(dets);
 
@@ -999,14 +1033,12 @@ export default function CameraStream({
       const vhsScore   = parseVhsScore(entry.result);
       const fiveSScore = parseFiveSScore(entry.result);
 
-      const yoloModel = (mode === "people" || mode === "auto") ? "yolo26n-pose" : "yolo26n";
-      const yoloTask  = mode === "people" ? "pose"
-                      : mode === "events" ? "track"
-                      : mode === "auto"   ? "unified"
-                      : "detect";
+      // AUTO 模式：同時執行 detect + pose，統一儲存
+      const yoloModel = "yolo26n-pose";   // AUTO 模式永遠使用 pose 模型（含 detect）
+      const yoloTask  = "unified";        // AUTO 模式統一任務
 
-      const poseKps = (mode === "people" || mode === "auto") ? poseToDbFormat(poseDetectionsRef.current) : undefined;
-      const tracks  = (mode === "events" || mode === "auto") ? sortTrackerRef.current.getSnapshot()      : undefined;
+      const poseKps = poseToDbFormat(poseDetectionsRef.current);
+      const tracks  = sortTrackerRef.current.getSnapshot();
 
       const detPayload = dets.map((d) => ({
         class_id:   d.classId,
@@ -1209,11 +1241,9 @@ export default function CameraStream({
       }, 15_000);
     }
 
-    // 人員模式：解析環境資訊
-    if (activeModeRef.current === "people") {
-      const env = parseEnvironment(finalText);
-      setEnvInfo(env);
-    }
+    // AUTO 統一全模式：解析環境資訊（含人員/場景評估）
+    const env = parseEnvironment(finalText);
+    setEnvInfo(env);
   }, []);
 
   /* ─────────────────────────────────────────────────────────────────────
@@ -1283,8 +1313,8 @@ export default function CameraStream({
             streamingAccRef.current += token;
             setStreamingText(streamingAccRef.current);
 
-            // 人員模式：即時解析 ENV: 行（逐 token 更新）
-            if (activeModeRef.current === "people") {
+            // AUTO 統一全模式：即時解析 ENV: 行（逐 token 更新）
+            {
               const partialEnv = parseEnvironment(streamingAccRef.current);
               if (partialEnv) setEnvInfo(partialEnv);
             }
@@ -1363,7 +1393,7 @@ export default function CameraStream({
       isAnalyzingRef.current = true;
       setStreamingText("");
       streamingAccRef.current = "";
-      if (activeModeRef.current === "people") setEnvInfo(null);
+      setEnvInfo(null);
       ws.send(JSON.stringify({
         image_base64: b64,
         prompt:       promptRef.current,
@@ -1375,7 +1405,7 @@ export default function CameraStream({
       setIsAnalyzing(true);
       isAnalyzingRef.current = true;
       setStreamingText("");
-      if (activeModeRef.current === "people") setEnvInfo(null);
+      setEnvInfo(null);
       try {
         const res = await vlmApi.diagnose({
           prompt:       promptRef.current,
@@ -1450,7 +1480,8 @@ export default function CameraStream({
   ───────────────────────────────────────────────────────────────────── */
   useEffect(() => {
     // 關閉 YOLO 或攝影機未開啟時清空畫布並結束循環
-    const needsReady = isAutoMode ? (yolo.status !== "ready") : (activeMode === "people" ? false : yolo.status !== "ready");
+    // AUTO 統一全模式：兩個模型都必須 ready 才啟動 RAF loop
+    const needsReady = yolo.status !== "ready" || yoloPose.status !== "ready";
     if (!yoloEnabled || !isCameraOn || needsReady) {
       if (yoloRafRef.current) cancelAnimationFrame(yoloRafRef.current);
       yoloRafRef.current = null;
@@ -1478,46 +1509,38 @@ export default function CameraStream({
       if (!video || !canvas || video.videoWidth === 0) return;
 
       const t0   = performance.now();
-      const mode = activeModeRef.current;
 
-      if (mode === "people" && yoloPose.status === "ready") {
-        // People 模式：使用 pose 模型（17 關鍵點）
-        yoloPose.detect(video).then((poses) => {
-          poseDetectionsRef.current = poses;
-          const fakeDets: YoloDetection[] = poses.map((p) => ({
-            classId: 0, className: "人員", classEn: "person",
-            confidence: p.confidence,
-            x: p.x, y: p.y, w: p.w, h: p.h,
-            risk: "critical" as const, category: "personnel" as const,
-          }));
-          yoloDetectionsRef.current = fakeDets;
-          setYoloDetections(fakeDets);
-          drawPoseOverlay(canvas as HTMLCanvasElement, video, poses);
-          const now = performance.now();
-          yoloFpsCountRef.current.count++;
-          if (now - yoloFpsCountRef.current.ts >= 1000) {
-            setYoloFps(yoloFpsCountRef.current.count);
-            setYoloInferMs(Math.round(now - t0));
-            yoloFpsCountRef.current = { count: 0, ts: now };
-          }
-        });
-
-      } else if (mode === "auto" && yolo.status === "ready" && yoloPose.status === "ready") {
-        // AUTO 統一全模式：detect + pose 同時執行，結果合併顯示
-        Promise.all([
+      // AUTO 統一全模式（固定）：detect + pose + segment + classify 並行
+      if (yolo.status === "ready" && yoloPose.status === "ready") {
+        // 核心任務：detect + pose（必須）
+        // 選用任務：segment + classify（模型就緒才執行）
+        const tasks: Promise<any>[] = [
           yolo.detect(video),
           yoloPose.detect(video),
-        ]).then(([dets, poses]) => {
+          yoloSegment.status === "ready" ? yoloSegment.detect(video) : Promise.resolve([]),
+          yoloClassify.status === "ready" ? yoloClassify.detect(video, 3) : Promise.resolve([]),
+        ];
+
+        (Promise.all(tasks) as Promise<[YoloDetection[], any[], SegmentDetection[], ClassifyResult[]]>)
+        .then(([dets, poses, segs, classes]) => {
           yoloDetectionsRef.current = dets;
           poseDetectionsRef.current = poses;
 
-          // SORT 追蹤（非人員物件）
-          const tracked = sortTrackerRef.current.update(
-            dets.filter((d) => d.category !== "personnel")
-          );
+          // SORT 追蹤（非人員物件 + 人員均追蹤）
+          const tracked = sortTrackerRef.current.update(dets);
           setYoloDetections(dets);
 
-          // 清空並重繪：先畫 detect 框，再疊 pose 骨架，再疊 trackId
+          // 行為偵測（detect + pose + track 三路輸入）
+          const behaviors = behaviorDetector.detect(dets, poses, tracked);
+          setBehaviorAlerts(behaviors);
+
+          // 場景分類結果
+          if (classes.length > 0) setSceneClasses(classes);
+
+          // 實例分割結果
+          if (segs.length > 0) setSegDetections(segs);
+
+          // 清空並重繪：detect 框 → pose 骨架 → trackId → 行為標籤
           const rect = video.getBoundingClientRect();
           canvas.width  = rect.width  || video.videoWidth;
           canvas.height = rect.height || video.videoHeight;
@@ -1529,7 +1552,7 @@ export default function CameraStream({
             drawYoloOverlay(canvas, video, nonPersonDets);
             // 2. Pose 骨架（人員）
             drawPoseOverlay(canvas as HTMLCanvasElement, video, poses);
-            // 3. Track ID 標籤
+            // 3. Track ID 標籤（所有追蹤目標）
             drawTrackIds(ctx2d, tracked as TrackedObject[], canvas.width, canvas.height);
           }
 
@@ -1542,34 +1565,8 @@ export default function CameraStream({
           }
         });
 
-      } else {
-        // Equipment / Events / Objects：使用偵測模型
-        yolo.detect(video).then((dets) => {
-          yoloDetectionsRef.current = dets;
-
-          if (mode === "events") {
-            // Events 模式：SORT 追蹤，繪製追蹤 ID
-            const tracked = sortTrackerRef.current.update(dets);
-            setYoloDetections(dets);
-            const ctx2d = canvas.getContext("2d");
-            if (ctx2d) {
-              drawYoloOverlay(canvas, video, dets);
-              drawTrackIds(ctx2d, tracked, canvas.width, canvas.height);
-            }
-          } else {
-            setYoloDetections(dets);
-            drawYoloOverlay(canvas, video, dets);
-          }
-
-          const now = performance.now();
-          yoloFpsCountRef.current.count++;
-          if (now - yoloFpsCountRef.current.ts >= 1000) {
-            setYoloFps(yoloFpsCountRef.current.count);
-            setYoloInferMs(Math.round(now - t0));
-            yoloFpsCountRef.current = { count: 0, ts: now };
-          }
-        });
       }
+      // 兩個模型尚未就緒時靜默等待（不渲染空幀）
     };
 
     yoloRafRef.current = requestAnimationFrame(loop);
@@ -1577,25 +1574,30 @@ export default function CameraStream({
       if (yoloRafRef.current) cancelAnimationFrame(yoloRafRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [yoloEnabled, isCameraOn, yolo.status, yoloPose.status, activeMode]);
+  }, [yoloEnabled, isCameraOn, yolo.status, yoloPose.status]);
 
   /* ─────────────────────────────────────────────────────────────────────
      Effect：YOLO 啟用時自動觸發模型載入（模式相關）
   ───────────────────────────────────────────────────────────────────── */
   useEffect(() => {
     if (!yoloEnabled) return;
-    if (activeMode === "auto") {
-      // AUTO 統一全模式：detect + pose 同時載入
-      if (yolo.status === "idle" || yolo.status === "error") yolo.loadModel();
-      if (yoloPose.status === "idle" || yoloPose.status === "error") yoloPose.loadModel();
-    } else if (activeMode === "people") {
-      // People 模式：只載入姿態模型
-      if (yoloPose.status === "idle" || yoloPose.status === "error") yoloPose.loadModel();
-    } else {
-      // Equipment / Events / Objects：只載入偵測模型
-      if (yolo.status === "idle" || yolo.status === "error") yolo.loadModel();
+    // AUTO 統一全模式（固定）：必要模型同步載入，選用模型延遲載入
+    // detect   → YOLO26n COCO-80 物件偵測（必要）
+    // pose     → YOLO26n-Pose 17 關鍵點骨架（必要）
+    // segment  → YOLO11n-Seg 實例分割（選用，背景載入）
+    // classify → YOLO11n-Cls 場景分類（選用，背景載入）
+    if (yolo.status === "idle" || yolo.status === "error") yolo.loadModel();
+    if (yoloPose.status === "idle" || yoloPose.status === "error") yoloPose.loadModel();
+    // 分割與分類模型在核心模型就緒後再載入（避免競爭 WASM 記憶體）
+    if (yolo.status === "ready" && yoloPose.status === "ready") {
+      if (yoloSegment.status === "idle") yoloSegment.loadModel();
+      if (yoloClassify.status === "idle") yoloClassify.loadModel();
     }
-  }, [yoloEnabled, activeMode, yolo.status, yoloPose.status, yolo.loadModel, yoloPose.loadModel]);
+  }, [
+    yoloEnabled,
+    yolo.status, yoloPose.status, yoloSegment.status, yoloClassify.status,
+    yolo.loadModel, yoloPose.loadModel, yoloSegment.loadModel, yoloClassify.loadModel,
+  ]);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
@@ -1618,14 +1620,11 @@ export default function CameraStream({
   ───────────────────────────────────────────────────────────────────── */
 
   const canAnalyze    = isCameraOn && !isAnalyzing;
-  const isPeopleMode  = activeMode === "people";
-  const isAutoMode    = activeMode === "auto";
-  const isYoloLoading = yolo.status === "loading" || (isAutoMode && yoloPose.status === "loading");
-  const isYoloReady   = isAutoMode
-    ? (yolo.status === "ready" && yoloPose.status === "ready")
-    : isPeopleMode
-      ? yoloPose.status === "ready"
-      : yolo.status === "ready";
+  // AUTO 統一全模式：固定使用 auto，不再允許切換至單一模式
+  const isPeopleMode  = false;           // 已整合進 AUTO（pose 在 auto 中並行執行）
+  const isAutoMode    = true;            // 永遠是 AUTO 模式
+  const isYoloLoading = yolo.status === "loading" || yoloPose.status === "loading";
+  const isYoloReady   = yolo.status === "ready" && yoloPose.status === "ready";
 
   /* ═══════════════════════════════════════════════════════════════════════
      Render
@@ -1634,33 +1633,64 @@ export default function CameraStream({
   return (
     <div className="space-y-3">
 
-      {/* ── 0. 辨識模式選擇列 ─────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none">
-        {RECOGNITION_MODES.map((mode) => {
-          const isActive = activeMode === mode.key;
-          const colorMap: Record<string, string> = {
-            brand:   isActive ? "border-brand-500/60 bg-brand-500/20 text-brand-200"       : "border-white/8 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]",
-            emerald: isActive ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-200" : "border-white/8 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]",
-            amber:   isActive ? "border-amber-500/50 bg-amber-500/15 text-amber-200"       : "border-white/8 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]",
-            violet:  isActive ? "border-violet-500/50 bg-violet-500/15 text-violet-200"    : "border-white/8 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]",
-            rose:    isActive ? "border-rose-500/60 bg-rose-500/20 text-rose-200 ring-1 ring-rose-500/30" : "border-white/8 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]",
-          };
-          return (
-            <button
-              key={mode.key}
-              onClick={() => handleModeChange(mode.key)}
-              className={`
-                flex flex-shrink-0 items-center gap-2 rounded-[14px] border px-3.5 py-2
-                text-xs font-medium transition-all
-                ${colorMap[mode.color]}
-              `}
-            >
-              {mode.icon}
-              <span>{mode.label}</span>
-              <span className="hidden text-[10px] opacity-60 sm:inline">{mode.labelEn}</span>
-            </button>
-          );
-        })}
+      {/* ── 0. AUTO 統一全模式 + 辨識能力標籤 ───────────────────────── */}
+      <div className="flex flex-col gap-2">
+
+        {/* AUTO 模式主狀態列 */}
+        <div className="flex items-center gap-2.5 rounded-[16px] border border-rose-500/40 bg-rose-500/10 px-3.5 py-2.5 backdrop-blur-sm">
+          <Cpu className="h-4 w-4 flex-shrink-0 text-rose-400" />
+          <div className="flex flex-col leading-tight">
+            <span className="text-xs font-semibold text-rose-200">統一全模式</span>
+            <span className="text-[10px] text-rose-300/60">AUTO · 4-in-1 Unified Analysis</span>
+          </div>
+
+          {/* YOLO 推論狀態 */}
+          <div className="ml-auto flex items-center gap-2">
+            {isYoloLoading && (
+              <div className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1">
+                <Loader2 className="h-2.5 w-2.5 animate-spin text-amber-400" />
+                <span className="text-[9px] text-amber-300">載入模型中…</span>
+              </div>
+            )}
+            {isYoloReady && (
+              <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                <span className="text-[9px] font-medium text-emerald-300">YOLO 就緒</span>
+              </div>
+            )}
+            <span className="hidden rounded-full border border-rose-500/30 bg-rose-500/15 px-2 py-0.5 text-[9px] font-bold tracking-wider text-rose-300 sm:inline">
+              4-IN-1
+            </span>
+          </div>
+        </div>
+
+        {/* 四種辨識能力提示（非可選，純顯示）*/}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+          <span className="flex-shrink-0 text-[10px] text-slate-500">涵蓋能力：</span>
+          {RECOGNITION_MODES.filter((m) => m.key !== "auto").map((cap) => {
+            const capColorMap: Record<string, string> = {
+              brand:   "border-brand-500/25 bg-brand-500/8 text-brand-300/80",
+              emerald: "border-emerald-500/25 bg-emerald-500/8 text-emerald-300/80",
+              amber:   "border-amber-500/25 bg-amber-500/8 text-amber-300/80",
+              violet:  "border-violet-500/25 bg-violet-500/8 text-violet-300/80",
+            };
+            return (
+              <div
+                key={cap.key}
+                title={cap.labelEn}
+                className={`
+                  flex flex-shrink-0 cursor-default items-center gap-1.5 rounded-full
+                  border px-2.5 py-1 text-[10px] font-medium select-none
+                  ${capColorMap[cap.color] ?? "border-white/10 bg-white/[0.03] text-slate-400"}
+                `}
+              >
+                {cap.icon}
+                <span>{cap.label}</span>
+                <span className="hidden opacity-50 sm:inline">{cap.labelEn}</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── 1. 攝影機主畫面 ──────────────────────────────────────────── */}
@@ -1733,8 +1763,8 @@ export default function CameraStream({
           )}
         </div>
 
-        {/* 人員模式：環境資訊即時疊加（左下角）*/}
-        {isPeopleMode && isCameraOn && (isAnalyzing || envInfo) && (
+        {/* AUTO 統一全模式：環境資訊即時疊加（左下角）*/}
+        {isCameraOn && (isAnalyzing || envInfo) && (
           <div className="absolute bottom-[72px] left-3 z-20 w-[min(280px,60vw)]">
             <div className="overflow-hidden rounded-[16px] border border-emerald-500/30 bg-slate-950/90 backdrop-blur-md shadow-xl">
               {/* 小標題 */}
@@ -1815,7 +1845,7 @@ export default function CameraStream({
           style={{ zIndex: 20, opacity: showOverlay && detectedObjects.length > 0 ? 1 : 0 }}
         />
 
-        {/* 偵測框數量角標 */}
+        {/* 偵測框數量角標（右下） */}
         {showOverlay && detectedObjects.length > 0 && !isAnalyzing && (
           <div className="absolute right-3 bottom-20 z-20 flex items-center gap-1.5 rounded-full border border-white/10 bg-slate-950/80 px-2.5 py-1 backdrop-blur-sm">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -1834,6 +1864,119 @@ export default function CameraStream({
             >✕</button>
           </div>
         )}
+
+        {/* ── 統一警示列：YOLO 物件偵測 + 行為偵測（畫面正下方中央）── */}
+        {isCameraOn && (() => {
+          const critical = yoloDetections.filter((d) => d.risk === "critical");
+          const warning  = yoloDetections.filter((d) => d.risk === "warning");
+          const allItems = [...critical, ...warning];
+
+          // 行為警報（critical 優先）
+          const behaviorCrit = behaviorAlerts.filter((b) => b.risk === "critical");
+          const behaviorWarn = behaviorAlerts.filter((b) => b.risk === "warning");
+
+          const hasAnything = allItems.length > 0 || behaviorAlerts.length > 0;
+          if (!hasAnything) return null;
+
+          const hasCrit = critical.length > 0 || behaviorCrit.length > 0;
+
+          // 依類別合併同名物件（取最高 conf）
+          const merged: { name: string; count: number; maxConf: number; risk: string; isBehavior?: boolean }[] = [];
+          for (const d of allItems) {
+            const ex = merged.find((m) => m.name === d.className && !m.isBehavior);
+            if (ex) { ex.count++; ex.maxConf = Math.max(ex.maxConf, d.confidence); }
+            else     merged.push({ name: d.className, count: 1, maxConf: d.confidence, risk: d.risk });
+          }
+          // 行為警報加入
+          for (const b of [...behaviorCrit, ...behaviorWarn]) {
+            merged.push({ name: b.nameZh, count: 1, maxConf: b.confidence, risk: b.risk, isBehavior: true });
+          }
+
+          return (
+            <div className="absolute bottom-[68px] left-1/2 z-30 -translate-x-1/2 pointer-events-none max-w-[90vw]">
+              <div className={`
+                flex flex-wrap items-center gap-2 rounded-2xl border px-4 py-2.5
+                backdrop-blur-xl shadow-2xl
+                ${hasCrit
+                  ? "border-red-500/70 bg-red-950/88 shadow-red-500/30"
+                  : "border-amber-500/60 bg-amber-950/85 shadow-amber-500/20"
+                }
+              `}>
+                {/* 風險等級大標 */}
+                <div className={`flex items-center gap-1.5 flex-shrink-0 ${hasCrit ? "text-red-300" : "text-amber-300"}`}>
+                  <span className={`text-lg font-black ${hasCrit ? "animate-pulse" : ""}`}>⚠</span>
+                  <span className="text-sm font-extrabold tracking-widest uppercase">
+                    {hasCrit ? "高危" : "警告"}
+                  </span>
+                </div>
+
+                {/* 分隔線 */}
+                <div className="h-5 w-px bg-white/20 flex-shrink-0" />
+
+                {/* 偵測物件 + 行為警報清單 */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {merged.slice(0, 6).map((item, i) => (
+                    <div
+                      key={i}
+                      className={`
+                        flex items-center gap-1.5 rounded-xl border px-3 py-1
+                        ${item.risk === "critical"
+                          ? item.isBehavior
+                            ? "border-rose-400/70 bg-rose-500/30 text-rose-100"
+                            : "border-red-400/50 bg-red-500/25 text-red-100"
+                          : item.isBehavior
+                            ? "border-orange-400/60 bg-orange-500/25 text-orange-100"
+                            : "border-amber-400/40 bg-amber-500/20 text-amber-100"
+                        }
+                      `}
+                    >
+                      {/* 行為標籤加上動作圖示 */}
+                      {item.isBehavior && <span className="text-[10px]">🔔</span>}
+                      <span className="text-sm font-bold">{item.name}</span>
+                      {item.count > 1 && (
+                        <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-white/10">
+                          ×{item.count}
+                        </span>
+                      )}
+                      <span className="text-sm font-semibold opacity-90">
+                        {Math.round(item.maxConf * 100)}%
+                      </span>
+                    </div>
+                  ))}
+                  {merged.length > 6 && (
+                    <span className="text-xs text-white/50">+{merged.length - 6}</span>
+                  )}
+                </div>
+
+                {/* 骨架提示 + 場景分類 */}
+                {(() => {
+                  const personCount = yoloDetections.filter((d) => d.category === "personnel").length;
+                  const topScene = sceneClasses[0];
+                  return (
+                    <>
+                      {personCount > 0 && (
+                        <>
+                          <div className="h-5 w-px bg-white/20 flex-shrink-0" />
+                          <span className="text-[10px] text-violet-300 font-semibold flex-shrink-0">
+                            骨架 ×{personCount}
+                          </span>
+                        </>
+                      )}
+                      {topScene && topScene.isFactoryRelevant && (
+                        <>
+                          <div className="h-5 w-px bg-white/20 flex-shrink-0" />
+                          <span className="text-[10px] text-cyan-300 font-semibold flex-shrink-0 max-w-[120px] truncate">
+                            {topScene.labelZh ?? topScene.label} {Math.round(topScene.confidence * 100)}%
+                          </span>
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* 未開啟攝影機時的佔位畫面 */}
         {!isCameraOn && (
@@ -2121,8 +2264,8 @@ export default function CameraStream({
         );
       })()}
 
-      {/* ── 3. 人員辨識模式：環境詳細資訊面板（結果下方）──────────────── */}
-      {isPeopleMode && (isAnalyzing || envInfo) && (
+      {/* ── 3. AUTO 統一全模式：環境詳細資訊面板（含人員/場景評估）──── */}
+      {(isAnalyzing || envInfo) && (
         <EnvironmentContextPanel envInfo={envInfo} isStreaming={isAnalyzing} />
       )}
 

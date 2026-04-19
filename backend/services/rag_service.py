@@ -121,10 +121,14 @@ async def semantic_search(
         logger.warning("Empty embedding for question, returning empty context.")
         return [], []
 
-    col    = _get_collection()
+    col   = _get_collection()
+    count = col.count()
+    if count == 0:
+        logger.info("ChromaDB collection is empty, returning empty context.")
+        return [], []
     result = col.query(
         query_embeddings=[vec],
-        n_results=min(top_k, col.count() or 1),
+        n_results=min(top_k, count),
         include=["documents", "metadatas", "distances"],
     )
 

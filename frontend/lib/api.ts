@@ -5,7 +5,7 @@
  */
 import axios from "axios";
 import { getSession } from "next-auth/react";
-import type { VlmSessionCapture } from "@/types";
+import type { VlmSessionCapture, FactoryEvent, EventStats } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -259,6 +259,32 @@ export const mqttDeviceApi = {
   /** 刪除閾值 */
   deleteThreshold: (deviceId: string, thresholdId: string) =>
     apiClient.delete(`/api/mqtt/devices/${deviceId}/thresholds/${thresholdId}`),
+};
+
+// ── Factory Events API ────────────────────────────────────────────────
+export const eventsApi = {
+  list: (params?: {
+    event_type?: string;
+    severity?: string;
+    resolved?: boolean;
+    since_h?: number;
+    limit?: number;
+    offset?: number;
+  }) => apiClient.get<FactoryEvent[]>("/api/events", { params }),
+
+  stats: () => apiClient.get<EventStats>("/api/events/stats"),
+
+  create: (data: Partial<FactoryEvent>) =>
+    apiClient.post<FactoryEvent>("/api/events", data),
+
+  acknowledge: (id: string) =>
+    apiClient.patch<FactoryEvent>(`/api/events/${id}/acknowledge`),
+
+  resolve: (id: string) =>
+    apiClient.patch<FactoryEvent>(`/api/events/${id}/resolve`),
+
+  delete: (id: string) =>
+    apiClient.delete(`/api/events/${id}`),
 };
 
 // ── 事件中心 API ──────────────────────────────────────────────────────

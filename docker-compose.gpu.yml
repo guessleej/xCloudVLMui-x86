@@ -1,0 +1,37 @@
+###############################################################################
+# docker-compose.gpu.yml — bot-x86 GPU 加速 overlay
+#
+# 使用方式（覆蓋 CPU 模式的 llama-cpp）：
+#   make up-gpu
+#   # 等同於：
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+#
+# 前提：已安裝 nvidia-docker2 / nvidia-container-toolkit
+#   sudo apt install nvidia-container-toolkit
+#   sudo systemctl restart docker
+###############################################################################
+
+services:
+  llama-cpp:
+    image: ghcr.io/ggerganov/llama.cpp:server-cuda
+    container_name: x86-llama-cpp
+    platform: linux/amd64
+    runtime: nvidia
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    command: >
+      --model /models/${MODEL_FILE:-gemma-4-e4b-it-Q4_K_M.gguf}
+      --host 0.0.0.0 --port 8080
+      --ctx-size 131072
+      --n-gpu-layers 99
+      --threads ${CPU_THREADS:-8}
+      --flash-attn
+      --log-disable
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
