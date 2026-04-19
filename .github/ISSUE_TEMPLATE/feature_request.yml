@@ -1,0 +1,109 @@
+name: "✨ 功能需求"
+description: 提議新功能或改善現有功能
+title: "[Feature] "
+labels: ["enhancement", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感謝您提出功能建議！
+        良好的功能說明有助於我們評估優先順序並規劃實作。
+
+  # ── 功能分類 ─────────────────────────────────────────────────────────
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 功能領域
+      description: 這個需求屬於哪個功能領域？
+      multiple: true
+      options:
+        - 設備監控（Equipment Dashboard）
+        - VHS 健康評分（VHS Score）
+        - 警報管理（Alert Management）
+        - RAG 知識庫（Knowledge Base）
+        - VLM 視覺分析（VLM Inference）
+        - MQTT 感測器整合（Sensor Integration）
+        - 維保工單（Maintenance Order）
+        - 報告匯出（Report Export）
+        - API 端點（Backend API）
+        - 使用者介面（Frontend UI）
+        - DevOps / CI/CD
+        - 安全性（Security）
+        - 效能優化（Performance）
+        - 其他
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 建議優先級
+      options:
+        - P0 — 關鍵（影響核心功能）
+        - P1 — 高（重要改善）
+        - P2 — 中（一般需求）
+        - P3 — 低（Nice to have）
+    validations:
+      required: true
+
+  # ── 需求描述 ─────────────────────────────────────────────────────────
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 問題 / 需求背景
+      description: 描述這個功能要解決的問題，或需求的背景
+      placeholder: |
+        目前每次設備發出警報時，需要手動登入系統才能查看，
+        在夜班或緊急情況下無法及時得知設備狀態...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 建議解決方案
+      description: 描述您希望如何實作此功能
+      placeholder: |
+        新增 LINE Notify / Webhook 整合，當警報等級為 critical 或 elevated 時，
+        自動推送通知至指定頻道，包含：設備名稱、警報等級、VHS 分數、發生時間...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 替代方案
+      description: 您是否考慮過其他解決方式？
+
+  # ── 驗收標準 ─────────────────────────────────────────────────────────
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 驗收標準（Acceptance Criteria）
+      description: 描述功能完成後的可驗證條件
+      placeholder: |
+        - [ ] 設備警報觸發後 < 30 秒內收到 LINE 通知
+        - [ ] 通知包含：設備 ID、等級、訊息、VHS 分數
+        - [ ] 支援關閉 / 靜音特定設備的通知
+        - [ ] GET /api/health 包含通知服務狀態
+
+  - type: textarea
+    id: mockup
+    attributes:
+      label: 設計草圖 / Mockup（可選）
+      description: 如果有 UI 需求，可貼上草圖截圖或文字描述
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 提交前確認
+      options:
+        - label: 我已搜尋過現有 Issues / PR，確認此需求尚未被提出
+          required: true
+        - label: 此功能符合 xCloudVLMui Platform 的工業設備監控使用情境
+          required: false

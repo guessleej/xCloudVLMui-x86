@@ -1,0 +1,135 @@
+name: "🐛 Bug 回報"
+description: 回報 xCloudVLMui Platform 的問題或異常行為
+title: "[Bug] "
+labels: ["bug", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感謝您提交 Bug 報告！
+        請儘量填寫以下資訊，以幫助我們更快速地重現和修復問題。
+
+  # ── 環境資訊 ─────────────────────────────────────────────────────────
+
+  - type: dropdown
+    id: service
+    attributes:
+      label: 發生問題的服務
+      description: 問題出現在哪個服務或元件？
+      multiple: true
+      options:
+        - Backend API（FastAPI）
+        - Frontend（Next.js 儀表板）
+        - MQTT Broker（Mosquitto）
+        - LLM 推論引擎（llama.cpp）
+        - VLM WebUI（視覺分析）
+        - RAG 知識庫（ChromaDB）
+        - Nginx 反向代理
+        - Docker Compose 部署
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 平台版本
+      description: 可在 GET /api/health 或 package.json 查詢
+      placeholder: "例：v1.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: 部署環境
+      options:
+        - AIR-030（Jetson AGX Orin / JetPack 6.0）
+        - 本機開發（docker-compose.dev.yml）
+        - x86 Linux Server
+        - 其他
+    validations:
+      required: true
+
+  # ── 問題描述 ─────────────────────────────────────────────────────────
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 問題描述
+      description: 清楚描述發生了什麼問題
+      placeholder: "當我執行 ... 時，系統顯示 ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 重現步驟
+      description: 逐步說明如何重現此問題
+      placeholder: |
+        1. 開啟儀表板 → 設備管理頁面
+        2. 點擊「壓縮機 #1」設備卡片
+        3. 查看 VHS 趨勢圖
+        4. 出現錯誤訊息 "..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 預期行為
+      description: 您預期系統應該如何運作？
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 實際行為
+      description: 系統實際表現的行為
+    validations:
+      required: true
+
+  # ── 技術資訊 ─────────────────────────────────────────────────────────
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 錯誤訊息 / 日誌
+      description: |
+        請貼上相關日誌（可從以下指令取得）：
+        ```
+        make logs-backend    # Backend 日誌
+        make logs-mqtt       # MQTT 日誌
+        docker compose logs --tail=50 <service>
+        ```
+      render: shell
+
+  - type: textarea
+    id: health
+    attributes:
+      label: 健康狀態
+      description: |
+        請貼上 `curl http://localhost/api/health | jq` 的輸出結果
+      render: json
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 其他補充資訊
+      description: 截圖、設定檔片段或其他相關資訊
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 提交前確認
+      options:
+        - label: 我已搜尋過現有 Issues，確認此問題尚未被回報
+          required: true
+        - label: 我已嘗試重新啟動服務（`make restart`）
+          required: false
+        - label: 我已查看 CHANGELOG.md，確認此非預期的棄用行為
+          required: false

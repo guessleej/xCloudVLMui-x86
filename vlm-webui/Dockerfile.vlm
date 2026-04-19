@@ -1,0 +1,48 @@
+###############################################################################
+# Dockerfile.vlm — live-vlm-webui for Jetson AGX Orin (ARM64 / JetPack 6.0)
+# Source: https://github.com/nvidia-ai-iot/live-vlm-webui
+###############################################################################
+
+FROM nvcr.io/nvidia/l4t-base:r36.3.0
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 系統依賴
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 python3-pip python3-dev \
+    git curl libssl-dev \
+    # WebRTC / aiortc 依賴
+    libavformat-dev libavcodec-dev libavdevice-dev \
+    libavutil-dev libswscale-dev libswresample-dev \
+    # V4L2 (USB 鏡頭)
+    v4l-utils \
+    # RealSense D455 SDK
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Clone live-vlm-webui
+RUN git clone --depth=1 https://github.com/nvidia-ai-iot/live-vlm-webui.git .
+
+# Python 依賴
+RUN pip3 install --no-cache-dir \
+    aiohttp \
+    aiohttp-cors \
+    aiortc \
+    av \
+    numpy \
+    Pillow \
+    requests \
+    pyrealsense2 || true   # RealSense SDK（可選，無 D455 時跳過）
+
+# 環境變數（執行時可覆寫）
+ENV LIVE_VLM_API_BASE=http://llama-cpp:8080/v1
+ENV LIVE_VLM_PORT=8090
+ENV LIVE_VLM_HOST=0.0.0.0
+
+EXPOSE 8090
+
+CMD ["python3", "server.py", \
+     "--host", "0.0.0.0", \
+     "--port", "8090", \
+     "--api-base", "http://llama-cpp:8080/v1"]

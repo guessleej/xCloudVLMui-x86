@@ -1,0 +1,221 @@
+###############################################################################
+# .github/workflows/release.yml — xCloudVLMui Platform Release Pipeline
+#
+# 觸發：push tag v*.*.*（Semantic Versioning）
+# 作業：
+#   validate-tag    — 驗證 tag 格式符合 semver
+#   build-push      — 建置並推送 Docker 映像至 GHCR
+#   create-release  — 從 CHANGELOG.md 抽取變更紀錄並建立 GitHub Release
+#   notify          — 發佈通知（可選）
+#
+# 使用前須設定以下 Repository Secrets：
+#   GHCR_TOKEN       — GitHub Container Registry PAT（write:packages）
+#   DEPLOY_SSH_KEY   — 部署機器 SSH 私鑰（可選，自動部署用）
+###############################################################################
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'          # v1.0.0
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+' # v1.0.0-rc.1
+
+env:
+  REGISTRY:      ghcr.io
+  IMAGE_OWNER:   ${{ github.repository_owner }}
+  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/xcloudvlmui-backend
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/xcloudvlmui-frontend
+
+jobs:
+
+# ── 1. Tag 格式驗證 ───────────────────────────────────────────────────
+  validate-tag:
+    name: Validate — SemVer tag
+    runs-on: ubuntu-latest
+    outputs:
+      version:    ${{ steps.parse.outputs.version }}
+      is_prerel:  ${{ steps.parse.outputs.is_prerel }}
+
+    steps:
+      - name: Parse version from tag
+        id: parse
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION"  >> "$GITHUB_OUTPUT"
+          if [[ "$TAG" == *"-rc."* ]]; then
+            echo "is_prerel=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerel=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Release version: $VERSION (pre-release: ${{ steps.parse.outputs.is_prerel }})"
+
+      - name: Validate semver format
+        run: |
+          VERSION="${{ steps.parse.outputs.version }}"
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$'; then
+            echo "::error::Invalid tag format: $VERSION. Expected: v<major>.<minor>.<patch>"
+            exit 1
+          fi
+
+
+# ── 2. Docker 映像建置 & 推送 ─────────────────────────────────────────
+  build-push:
+    name: Docker — Build & Push to GHCR
+    runs-on: ubuntu-latest
+    needs: validate-tag
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        include:
+          - service:  backend
+            context:  ./backend
+            image:    ${{ env.BACKEND_IMAGE }}
+          - service:  frontend
+            context:  ./frontend
+            image:    ${{ env.FRONTEND_IMAGE }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (ARM64 cross-compile for Jetson)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ matrix.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ needs.validate-tag.outputs.is_prerel == 'false' }}
+          labels: |
+            org.opencontainers.image.title=xCloudVLMui Platform — ${{ matrix.service }}
+            org.opencontainers.image.description=由 云碩科技 xCloudinfo Corp.Limited 開發，專為 Advantech AIR-030 (Jetson AGX Orin 64GB) 邊緣主機設計的工廠設備健康管理平台
+            org.opencontainers.image.vendor=云碩科技 xCloudinfo Corp.Limited
+
+      - name: Build & Push ${{ matrix.service }}
+        uses: docker/build-push-action@v5
+        with:
+          context:   ${{ matrix.context }}
+          push:      true
+          platforms: linux/amd64,linux/arm64
+          tags:      ${{ steps.meta.outputs.tags }}
+          labels:    ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to:   type=gha,scope=${{ matrix.service }},mode=max
+          build-args: |
+            BUILD_VERSION=${{ needs.validate-tag.outputs.version }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            GIT_SHA=${{ github.sha }}
+
+
+# ── 3. GitHub Release 建立 ────────────────────────────────────────────
+  create-release:
+    name: Release — Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-tag, build-push]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION="v${{ needs.validate-tag.outputs.version }}"
+          # 抽取 CHANGELOG.md 中對應版本的段落
+          BODY=$(awk "/^## \[${VERSION#v}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          if [ -z "$BODY" ]; then
+            BODY="請參考 [CHANGELOG.md](CHANGELOG.md) 了解本版本的完整變更紀錄。"
+          fi
+          # 寫入多行輸出
+          {
+            echo "body<<CHANGELOG_EOF"
+            echo "## xCloudVLMui Platform $VERSION"
+            echo ""
+            echo "$BODY"
+            echo ""
+            echo "---"
+            echo "**Docker 映像**"
+            echo '```'
+            echo "ghcr.io/${{ env.IMAGE_OWNER }}/xcloudvlmui-backend:${{ needs.validate-tag.outputs.version }}"
+            echo "ghcr.io/${{ env.IMAGE_OWNER }}/xcloudvlmui-frontend:${{ needs.validate-tag.outputs.version }}"
+            echo '```'
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create release archive
+        run: |
+          VERSION="${{ needs.validate-tag.outputs.version }}"
+          # 打包部署所需檔案（排除 node_modules / __pycache__ / .git）
+          tar --exclude='./frontend/node_modules' \
+              --exclude='./__pycache__'          \
+              --exclude='./.git'                 \
+              --exclude='./backend/.venv'        \
+              -czf "xcloudvlmui-platform-${VERSION}.tar.gz" \
+              docker-compose.yml docker-compose.dev.yml \
+              Makefile mosquitto/ nginx/ CHANGELOG.md
+          echo "Archive created: xcloudvlmui-platform-${VERSION}.tar.gz"
+          ls -lh "xcloudvlmui-platform-${VERSION}.tar.gz"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name:    ${{ github.ref_name }}
+          name:        "xCloudVLMui Platform v${{ needs.validate-tag.outputs.version }}"
+          body:        ${{ steps.changelog.outputs.body }}
+          prerelease:  ${{ needs.validate-tag.outputs.is_prerel == 'true' }}
+          draft:       false
+          files: |
+            xcloudvlmui-platform-${{ needs.validate-tag.outputs.version }}.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+# ── 4. 發佈後摘要 ─────────────────────────────────────────────────────
+  release-summary:
+    name: Release — Summary
+    runs-on: ubuntu-latest
+    needs: [validate-tag, build-push, create-release]
+    if: always()
+
+    steps:
+      - name: Print release summary
+        run: |
+          echo "## Release Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Item | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Version | v${{ needs.validate-tag.outputs.version }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Pre-release | ${{ needs.validate-tag.outputs.is_prerel }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Docker Build | ${{ needs.build-push.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| GitHub Release | ${{ needs.create-release.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Images pushed:**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`ghcr.io/${{ env.IMAGE_OWNER }}/xcloudvlmui-backend:${{ needs.validate-tag.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`ghcr.io/${{ env.IMAGE_OWNER }}/xcloudvlmui-frontend:${{ needs.validate-tag.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,372 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --brand: 22 100% 55%;
+    --accent: 190 81% 55%;
+    --panel-edge: 200 42% 55%;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    background: #07111c;
+  }
+
+  body {
+    @apply min-h-screen bg-surface text-slate-100 antialiased;
+    font-family: "IBM Plex Sans TC", "Noto Sans TC", sans-serif;
+    background-image:
+      radial-gradient(circle at 18% 18%, rgba(49, 207, 231, 0.16), transparent 28%),
+      radial-gradient(circle at 84% 10%, rgba(255, 118, 22, 0.13), transparent 26%),
+      linear-gradient(180deg, #0b1827 0%, #07111c 48%, #050c15 100%);
+    background-attachment: fixed;
+    position: relative;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.38), rgba(0, 0, 0, 0.9));
+    opacity: 0.35;
+    z-index: -1;
+  }
+
+  *::selection {
+    background: rgba(255, 118, 22, 0.28);
+    color: #fff;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(13, 29, 45, 0.72);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(107, 141, 171, 0.54);
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(156, 189, 216, 0.62);
+  }
+}
+
+@layer components {
+  .panel {
+    @apply border shadow-panel backdrop-blur-xl;
+    border-radius: 28px;
+    border-color: rgba(255, 255, 255, 0.1);
+    background-image: linear-gradient(
+      180deg,
+      rgba(16, 35, 54, 0.9) 0%,
+      rgba(7, 17, 28, 0.96) 100%
+    );
+  }
+
+  .panel-soft {
+    @apply border shadow-panel backdrop-blur-lg;
+    border-radius: 24px;
+    border-color: rgba(255, 255, 255, 0.08);
+    background-color: rgba(255, 255, 255, 0.035);
+  }
+
+  .panel-grid {
+    @apply panel relative overflow-hidden;
+  }
+
+  .panel-grid::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.45;
+  }
+
+  .panel-grid::after {
+    content: "";
+    position: absolute;
+    inset: -25% 0 auto;
+    height: 22%;
+    pointer-events: none;
+    background: linear-gradient(180deg, transparent 0%, rgba(49, 207, 231, 0.18) 48%, transparent 100%);
+    opacity: 0.45;
+    animation: scanLine 6s linear infinite;
+  }
+
+  .section-kicker {
+    @apply inline-flex items-center gap-2 border font-semibold uppercase text-slate-300;
+    border-radius: 999px;
+    border-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.04);
+    padding: 0.25rem 0.75rem;
+    font-size: 10px;
+    letter-spacing: 0.28em;
+  }
+
+  .display-title {
+    @apply font-display font-semibold text-white;
+    letter-spacing: 0.02em;
+  }
+
+  .metric-card {
+    @apply panel-soft p-5 transition-all duration-300 hover:-translate-y-0.5;
+  }
+
+  .metric-card:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .signal-chip {
+    @apply inline-flex items-center gap-2 border font-medium text-slate-200;
+    border-radius: 999px;
+    border-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.05);
+    padding: 0.375rem 0.75rem;
+    font-size: 11px;
+  }
+
+  .primary-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50;
+    border-color: rgba(255, 141, 50, 0.3);
+    background-color: rgba(255, 118, 22, 0.92);
+  }
+
+  .primary-button:hover {
+    background-color: rgba(255, 141, 50, 0.96);
+    box-shadow: 0 14px 32px rgba(255, 118, 22, 0.28);
+  }
+
+  .secondary-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-medium text-slate-200 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50;
+    border-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.04);
+  }
+
+  .secondary-button:hover {
+    border-color: rgba(49, 207, 231, 0.3);
+    background-color: rgba(49, 207, 231, 0.1);
+    color: #fff;
+  }
+
+  .ghost-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-transparent px-4 py-2.5 text-sm font-medium text-slate-400 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .ghost-button:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.04);
+    color: #fff;
+  }
+
+  .nav-link {
+    @apply relative flex items-start gap-3 border border-transparent px-4 py-3 text-slate-300 transition-all duration-200;
+    border-radius: 22px;
+  }
+
+  .nav-link:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.045);
+    color: #fff;
+  }
+
+  .nav-link.active {
+    color: #fff;
+    border-color: rgba(49, 207, 231, 0.2);
+    background-color: rgba(49, 207, 231, 0.1);
+    box-shadow: 0 0 0 1px rgba(49, 207, 231, 0.18), 0 0 30px rgba(49, 207, 231, 0.16);
+  }
+
+  .status-pill {
+    @apply inline-flex items-center justify-center rounded-full border px-2.5 py-1 font-semibold uppercase;
+    min-width: 72px;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+  }
+
+  .status-pill-ok {
+    border-color: rgba(74, 222, 128, 0.2);
+    background-color: rgba(74, 222, 128, 0.1);
+    color: #a7f3d0;
+  }
+
+  .status-pill-warn {
+    border-color: rgba(251, 191, 36, 0.2);
+    background-color: rgba(251, 191, 36, 0.1);
+    color: #fde68a;
+  }
+
+  .status-pill-danger {
+    border-color: rgba(251, 113, 133, 0.2);
+    background-color: rgba(251, 113, 133, 0.1);
+    color: #fecdd3;
+  }
+
+  .badge-critical {
+    @apply rounded-full border px-2.5 py-1 font-medium;
+    border-color: rgba(251, 113, 133, 0.2);
+    background-color: rgba(251, 113, 133, 0.1);
+    color: #fecdd3;
+    font-size: 11px;
+  }
+
+  .badge-elevated {
+    @apply rounded-full border px-2.5 py-1 font-medium;
+    border-color: rgba(251, 191, 36, 0.2);
+    background-color: rgba(251, 191, 36, 0.1);
+    color: #fde68a;
+    font-size: 11px;
+  }
+
+  .badge-moderate {
+    @apply rounded-full border px-2.5 py-1 font-medium;
+    border-color: rgba(56, 189, 248, 0.2);
+    background-color: rgba(56, 189, 248, 0.1);
+    color: #bae6fd;
+    font-size: 11px;
+  }
+
+  .badge-low {
+    @apply rounded-full border px-2.5 py-1 font-medium;
+    border-color: rgba(74, 222, 128, 0.2);
+    background-color: rgba(74, 222, 128, 0.1);
+    color: #bbf7d0;
+    font-size: 11px;
+  }
+
+  .chat-bubble-user {
+    @apply rounded-br-lg border px-4 py-3 text-white;
+    border-radius: 26px;
+    border-color: rgba(255, 141, 50, 0.2);
+    background-color: rgba(255, 118, 22, 0.12);
+    box-shadow: 0 18px 40px rgba(255, 118, 22, 0.12);
+  }
+
+  .chat-bubble-ai {
+    @apply rounded-bl-lg border px-4 py-3 text-slate-100;
+    border-radius: 26px;
+    border-color: rgba(255, 255, 255, 0.08);
+    background-color: rgba(255, 255, 255, 0.045);
+    box-shadow: 0 18px 40px rgba(5, 12, 21, 0.22);
+  }
+
+  .table-chip {
+    @apply inline-flex items-center rounded-full border px-2.5 py-1 font-medium text-slate-300;
+    border-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.04);
+    font-size: 11px;
+  }
+}
+
+.markdown-body {
+  @apply text-sm leading-7 text-slate-200;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+  @apply font-semibold text-white;
+}
+
+.markdown-body h1 {
+  @apply mb-4 mt-8 text-3xl;
+}
+
+.markdown-body h2 {
+  @apply mb-3 mt-8 border-b pb-3 text-2xl;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.markdown-body h3 {
+  @apply mb-2 mt-6 text-lg text-accent-200;
+}
+
+.markdown-body p,
+.markdown-body ul,
+.markdown-body ol,
+.markdown-body blockquote,
+.markdown-body table,
+.markdown-body pre {
+  @apply mb-4;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  @apply pl-5;
+}
+
+.markdown-body li {
+  @apply mb-1.5;
+}
+
+.markdown-body strong {
+  @apply font-semibold text-white;
+}
+
+.markdown-body a {
+  @apply text-accent-200 underline underline-offset-4;
+  text-decoration-color: rgba(103, 232, 249, 0.4);
+}
+
+.markdown-body code {
+  @apply rounded-md border px-1.5 py-0.5 font-mono text-brand-200;
+  border-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(2, 6, 23, 0.8);
+  font-size: 13px;
+}
+
+.markdown-body pre {
+  @apply overflow-x-auto border p-4;
+  border-radius: 20px;
+  border-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(2, 6, 23, 0.8);
+}
+
+.markdown-body pre code {
+  @apply border-none bg-transparent p-0 text-slate-100;
+}
+
+.markdown-body table {
+  @apply w-full border-collapse overflow-hidden;
+  border-radius: 20px;
+}
+
+.markdown-body th {
+  @apply border px-3 py-2 text-left text-xs font-semibold uppercase text-slate-300;
+  border-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.05);
+  letter-spacing: 0.18em;
+}
+
+.markdown-body td {
+  @apply border px-3 py-3;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.markdown-body blockquote {
+  @apply rounded-r-2xl border-l-4 border-brand-400 px-4 py-2 text-slate-300;
+  background-color: rgba(255, 118, 22, 0.05);
+}
+
+.form-input {
+  @apply w-full rounded-[14px] border border-white/10 bg-slate-950/50 px-3.5 py-2.5 text-sm text-white placeholder-slate-600 outline-none transition-colors focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20;
+}

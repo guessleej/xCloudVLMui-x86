@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json.schemastore.org/eslintrc",
+
+  "extends": [
+    "next/core-web-vitals",
+    "next/typescript"
+  ],
+
+  "plugins": [
+    "@typescript-eslint"
+  ],
+
+  "rules": {
+
+    // ── TypeScript ─────────────────────────────────────────────────
+
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "vars":               "all",
+        "args":               "after-used",
+        "ignoreRestSiblings": true,
+        "argsIgnorePattern":  "^_",
+        "varsIgnorePattern":  "^_"
+      }
+    ],
+    "@typescript-eslint/no-explicit-any":     "warn",
+    "@typescript-eslint/no-empty-object-type":"warn",
+    "@typescript-eslint/consistent-type-imports": [
+      "error",
+      { "prefer": "type-imports", "fixStyle": "inline-type-imports" }
+    ],
+
+    // ── React ──────────────────────────────────────────────────────
+
+    "react/no-unescaped-entities":   "error",
+    "react/display-name":            "off",
+    "react/prop-types":              "off",
+    "react-hooks/rules-of-hooks":    "error",
+    "react-hooks/exhaustive-deps":   "warn",
+
+    // ── Next.js ────────────────────────────────────────────────────
+
+    "@next/next/no-html-link-for-pages": "error",
+    "@next/next/no-img-element":          "warn",
+
+    // ── Import 排序 ────────────────────────────────────────────────
+
+    "import/order": [
+      "error",
+      {
+        "groups": [
+          "builtin",
+          "external",
+          ["internal", "parent", "sibling", "index"],
+          "type"
+        ],
+        "pathGroups": [
+          { "pattern": "react",    "group": "external", "position": "before" },
+          { "pattern": "next/**",  "group": "external", "position": "before" },
+          { "pattern": "@/**",     "group": "internal" }
+        ],
+        "pathGroupsExcludedImportTypes": ["react"],
+        "newlines-between": "always",
+        "alphabetize": { "order": "asc", "caseInsensitive": true }
+      }
+    ],
+
+    // ── 一般 JS ────────────────────────────────────────────────────
+
+    "no-console": [
+      "warn",
+      { "allow": ["warn", "error"] }
+    ],
+    "no-debugger":          "error",
+    "no-duplicate-imports": "error",
+    "prefer-const":         "error",
+    "eqeqeq":              ["error", "always"],
+    "curly":               ["error", "multi-line"],
+    "no-var":               "error",
+
+    // ── Accessibility（基礎規則）──────────────────────────────────
+
+    "jsx-a11y/alt-text":                "warn",
+    "jsx-a11y/anchor-has-content":      "warn",
+    "jsx-a11y/click-events-have-key-events": "warn",
+    "jsx-a11y/no-static-element-interactions": "warn"
+  },
+
+  "overrides": [
+    {
+      // 設定檔：放寬 require / any 限制
+      "files": [
+        "next.config.*",
+        "tailwind.config.*",
+        "postcss.config.*"
+      ],
+      "rules": {
+        "@typescript-eslint/no-explicit-any":  "off",
+        "@typescript-eslint/no-require-imports":"off"
+      }
+    },
+    {
+      // 型別定義檔
+      "files": ["**/*.d.ts"],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off"
+      }
+    },
+    {
+      // API Route Handlers (app/api/**)
+      "files": ["app/api/**/*.ts", "app/api/**/*.tsx"],
+      "rules": {
+        "no-console": "off"
+      }
+    }
+  ],
+
+  "settings": {
+    "react": {
+      "version": "detect"
+    },
+    "import/resolver": {
+      "typescript": {
+        "alwaysTryTypes": true,
+        "project":        "./tsconfig.json"
+      }
+    }
+  },
+
+  "env": {
+    "browser": true,
+    "node":    true,
+    "es2022":  true
+  },
+
+  "ignorePatterns": [
+    "node_modules/",
+    ".next/",
+    "out/",
+    "dist/",
+    "coverage/",
+    "**/*.min.js",
+    "public/"
+  ]
+}

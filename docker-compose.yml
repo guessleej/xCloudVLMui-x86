@@ -1,0 +1,276 @@
+###############################################################################
+# docker-compose.yml — xCloudVLMui Platform [bot-x86]
+#
+# 目標硬體：一般 x86-64 Linux 伺服器 / 工作站
+# 架構    ：AMD64 (x86_64)
+# 加速    ：可選 NVIDIA GPU（nvidia-docker）或純 CPU 推論
+# OS      ：Ubuntu 22.04 / Debian 12 / RHEL 9
+#
+# Port 配置（bot-x86 專用，不與其他實例衝突）：
+#   nginx    → 8680:80    ← 主要入口
+#   backend  → 8301:8000
+#   frontend → 3300:3000
+#   llama-cpp→ 18280:8080
+#   vlm-webui→ 8380:8090
+#   cadvisor → 8381:8080
+#   mosquitto→ 1885/9003
+#
+# 快速啟動（CPU 模式）：
+#   make setup && make up
+#
+# GPU 模式（需安裝 nvidia-docker2）：
+#   make setup && make up-gpu
+###############################################################################
+
+name: xcloudvlmui-x86
+
+# ── 共用環境變數 ─────────────────────────────────────────────────────
+x-llm-env: &llm-env
+  LLM_BASE_URL:    http://llama-cpp:8080
+  LLM_MODEL:       gemma-4-e4b-it
+  LLM_CTX_SIZE:    "131072"
+  LLM_MAX_TOKENS:  "4096"
+  LLM_TEMPERATURE: "0.1"
+  EMBED_MODEL_URL: http://llama-cpp:8080
+  EMBED_MODEL:     nomic-embed-text
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+
+  # ──────────────────────────────────────────────────────────────────
+  # [1] model-init — 從 HuggingFace 下載 GGUF 模型
+  # ──────────────────────────────────────────────────────────────────
+  model-init:
+    image: python:3.11-slim
+    container_name: x86-model-init
+    platform: linux/amd64
+    volumes:
+      - model-data:/models
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+      - MODEL_REPO=${MODEL_REPO:-bartowski/google_gemma-4-e4b-it-GGUF}
+      - MODEL_FILE=${MODEL_FILE:-gemma-4-e4b-it-Q4_K_M.gguf}
+    command: >
+      /bin/bash -c "
+        MODEL=/models/$${MODEL_FILE} ;
+        if [ -f \"$$MODEL\" ]; then echo '[model-init] already exists, skip.'; exit 0; fi ;
+        pip install -q huggingface-hub ;
+        python3 -c \"
+          from huggingface_hub import hf_hub_download
+          import os, shutil
+          p = hf_hub_download(repo_id=os.environ['MODEL_REPO'],
+                              filename=os.environ['MODEL_FILE'],
+                              token=os.environ.get('HF_TOKEN') or None)
+          shutil.move(p, '/models/' + os.environ['MODEL_FILE'])
+          print('[model-init] Done')
+        \"
+      "
+    restart: "no"
+    networks: [x86-net]
+
+  # ──────────────────────────────────────────────────────────────────
+  # [2] mosquitto — Eclipse MQTT Broker
+  # ──────────────────────────────────────────────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: x86-mqtt
+    platform: linux/amd64
+    restart: unless-stopped
+    ports:
+      - "1885:1883"
+      - "9003:9001"
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - x86-mosquitto-data:/mosquitto/data
+      - x86-mosquitto-log:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_pub -h localhost -p 1883 -t health -m ping -q 0 2>/dev/null && echo ok || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks: [x86-net]
+    logging: *default-logging
+
+  # ──────────────────────────────────────────────────────────────────
+  # [3] llama-cpp — CPU 推論（預設）
+  #     GPU 加速：改用 llama-cpp-gpu service（見 docker-compose.gpu.yml）
+  # ──────────────────────────────────────────────────────────────────
+  llama-cpp:
+    image: ghcr.io/ggerganov/llama.cpp:server
+    container_name: x86-llama-cpp
+    platform: linux/amd64
+    restart: unless-stopped
+    depends_on:
+      model-init:
+        condition: service_completed_successfully
+    volumes:
+      - model-data:/models:ro
+    ports:
+      - "18280:8080"
+    command: >
+      --model /models/${MODEL_FILE:-gemma-4-e4b-it-Q4_K_M.gguf}
+      --host 0.0.0.0 --port 8080
+      --ctx-size 131072
+      --threads ${CPU_THREADS:-8}
+      --log-disable
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks: [x86-net]
+    logging: *default-logging
+
+  # ──────────────────────────────────────────────────────────────────
+  # [4] vlm-webui — 即時視覺分析 WebUI（WebRTC）
+  # ──────────────────────────────────────────────────────────────────
+  vlm-webui:
+    build:
+      context: ./vlm-webui
+      dockerfile: Dockerfile
+      platforms: [linux/amd64]
+    image: xcloudvlmui/vlm-webui:x86
+    container_name: x86-vlm-webui
+    restart: unless-stopped
+    environment:
+      <<: *llm-env
+    depends_on:
+      llama-cpp:
+        condition: service_healthy
+    ports:
+      - "8380:8090"
+    networks: [x86-net]
+    logging: *default-logging
+
+  # ──────────────────────────────────────────────────────────────────
+  # [5] backend — FastAPI 中介層
+  # ──────────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      platforms: [linux/amd64]
+    image: xcloudvlmui/backend:x86
+    container_name: x86-backend
+    restart: unless-stopped
+    environment:
+      <<: *llm-env
+      DATABASE_URL: sqlite+aiosqlite:////data/app.db
+      CHROMA_PATH:  /data/chroma
+      UPLOAD_DIR:   /data/uploads
+      OCR_ENGINE:   vlm
+      SECRET_KEY:   ${SECRET_KEY:-change-me-x86}
+      MQTT_HOST:    mosquitto
+      MQTT_PORT:    "1883"
+    depends_on:
+      llama-cpp:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    volumes:
+      - x86-backend-data:/data
+    ports:
+      - "8301:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [x86-net]
+    logging: *default-logging
+
+  # ──────────────────────────────────────────────────────────────────
+  # [6] frontend — Next.js 儀表板
+  # ──────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      platforms: [linux/amd64]
+      args:
+        NEXTAUTH_URL:        http://localhost:8680
+        NEXT_PUBLIC_API_URL: http://localhost:8301
+        NEXT_PUBLIC_WS_URL:  ws://localhost:8301
+    image: xcloudvlmui/frontend:x86
+    container_name: x86-frontend
+    restart: unless-stopped
+    environment:
+      NEXTAUTH_URL:         ${NEXTAUTH_URL:-http://localhost:8680}
+      NEXTAUTH_SECRET:      ${NEXTAUTH_SECRET:-change-me}
+      NEXT_PUBLIC_API_URL:  http://localhost:8301
+      NEXT_PUBLIC_WS_URL:   ws://localhost:8301
+      GOOGLE_CLIENT_ID:     ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3300:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 >/dev/null 2>&1 || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks: [x86-net]
+    logging: *default-logging
+
+  # ──────────────────────────────────────────────────────────────────
+  # [7] nginx — 反向代理
+  # ──────────────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: x86-nginx
+    platform: linux/amd64
+    restart: unless-stopped
+    depends_on: [frontend, backend]
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8680:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/api/health >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks: [x86-net]
+    logging: *default-logging
+
+  # ──────────────────────────────────────────────────────────────────
+  # [8] cadvisor — 容器資源監控
+  # ──────────────────────────────────────────────────────────────────
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: x86-cadvisor
+    platform: linux/amd64
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8381:8080"
+    networks: [x86-net]
+    logging: *default-logging
+
+networks:
+  x86-net:
+    name: x86-xcloud-net
+    driver: bridge
+
+volumes:
+  model-data:
+    name: x86-model-data
+  x86-mosquitto-data:
+  x86-mosquitto-log:
+  x86-backend-data:

@@ -1,0 +1,52 @@
+# Node
+node_modules/
+.next/
+dist/
+.npm
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Env / Secrets
+.env
+.env.local
+.env.production
+frontend/.env.local
+backend/.env
+
+# Database / Vector DB
+*.db
+*.db-journal
+chroma_data/
+backend/chroma_data/
+backend/uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Models (大型 GGUF 檔案請另外管理)
+models/*.gguf
+models/*.bin
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Claude Code 工作目錄快取（不應提交）
+.claude/
+
+# YOLO 模型暫存檔（根目錄，非 public/models/ 的）
+frontend/*.onnx
+frontend/*.pt
+frontend/*.bin
+
+# macOS iCloud Drive 衝突副本（自動產生的 "filename 2.ext" 格式）
+* 2.*
+* 2

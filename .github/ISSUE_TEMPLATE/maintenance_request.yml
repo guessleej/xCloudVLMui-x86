@@ -1,0 +1,175 @@
+name: "🔧 設備維保工單"
+description: 建立現場設備維護保養工單（xCloudVLMui Platform 專屬）
+title: "[維保] "
+labels: ["maintenance", "field-ops"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 設備維保工單
+        本工單由 xCloudVLMui Platform 設備監控系統生成或由現場工程師手動提交。
+        請詳細填寫設備資訊與維保內容，以利排程與追蹤。
+
+        > ⚠️ 緊急設備故障請直接聯繫廠區負責人，勿等待工單審核。
+
+  # ── 設備資訊 ─────────────────────────────────────────────────────────
+
+  - type: input
+    id: equipment_id
+    attributes:
+      label: 設備 ID
+      description: AIR-030 設備編號（格式：AIR-030-XX）
+      placeholder: "AIR-030-01"
+    validations:
+      required: true
+
+  - type: input
+    id: equipment_name
+    attributes:
+      label: 設備名稱
+      placeholder: "壓縮機 #1"
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: 設備位置
+      placeholder: "廠房 A / 區域 1"
+    validations:
+      required: true
+
+  - type: input
+    id: vhs_score
+    attributes:
+      label: 當前 VHS 健康評分
+      description: 可從儀表板或 GET /api/vhs/trend/{equipment_id} 取得
+      placeholder: "28.5"
+
+  # ── 維保類型 ─────────────────────────────────────────────────────────
+
+  - type: dropdown
+    id: maintenance_type
+    attributes:
+      label: 維保類型
+      options:
+        - 預防性維護（Preventive Maintenance）
+        - 故障修復（Corrective Maintenance）
+        - 緊急搶修（Emergency Repair）
+        - 定期保養（Scheduled Service）
+        - 零件更換（Parts Replacement）
+        - 校正 / 調整（Calibration / Adjustment）
+        - 設備清潔（Cleaning）
+    validations:
+      required: true
+
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: 緊急程度
+      options:
+        - 🔴 緊急（立即處理，< 2 小時）
+        - 🟠 高（本班次內處理，< 8 小時）
+        - 🟡 中（本日內處理，< 24 小時）
+        - 🟢 低（7 天內排程）
+        - ⚪ 計畫性（下次定期保養時處理）
+    validations:
+      required: true
+
+  # ── 問題描述 ─────────────────────────────────────────────────────────
+
+  - type: textarea
+    id: symptom
+    attributes:
+      label: 異常現象描述
+      description: 描述設備的異常症狀、感測器讀數或 VLM 視覺分析結果
+      placeholder: |
+        - 軸承溫度：78°C（警戒值 70°C）
+        - 異常振動：感測器偵測到 12Hz 週期振動
+        - VLM 分析：「軸承磨損初期，皮帶輕微偏移 ~3mm」
+        - 系統警報：2 件 critical 警報（過去 2 小時）
+    validations:
+      required: true
+
+  - type: textarea
+    id: cause_analysis
+    attributes:
+      label: 初步原因分析
+      description: 現場工程師或 VLM 分析的可能原因
+      placeholder: |
+        根據 VHS 趨勢（7 天內從 65 → 28）與熱像儀影像判斷，
+        疑似潤滑脂不足導致軸承溫升，建議補充潤滑脂並進行磨損檢查...
+
+  - type: textarea
+    id: action_required
+    attributes:
+      label: 建議維保動作
+      description: 所需執行的具體維護步驟
+      placeholder: |
+        1. 停機確認安全鎖定
+        2. 檢查軸承間隙（標準值 0.02–0.05mm）
+        3. 補充 Shell Gadus S2 V220 潤滑脂
+        4. 更換 SKF 6208-2RS 軸承（如磨損超標）
+        5. 試運轉 30 分鐘後確認溫度回到正常範圍
+    validations:
+      required: true
+
+  # ── 資源與排程 ───────────────────────────────────────────────────────
+
+  - type: input
+    id: assigned_to
+    attributes:
+      label: 指定維修工程師
+      placeholder: "王大明 / ext.123"
+
+  - type: input
+    id: scheduled_time
+    attributes:
+      label: 排定維保時間
+      placeholder: "2026-04-12 08:00 (停機時段)"
+
+  - type: input
+    id: estimated_downtime
+    attributes:
+      label: 預估停機時間
+      placeholder: "約 2 小時"
+
+  - type: textarea
+    id: parts_required
+    attributes:
+      label: 所需備品 / 零件
+      placeholder: |
+        - SKF 6208-2RS 深溝球軸承 × 2
+        - Shell Gadus S2 V220 潤滑脂 × 1 盒
+        - O-Ring 密封圈 Ø50mm × 4
+
+  # ── 附件 ────────────────────────────────────────────────────────────
+
+  - type: textarea
+    id: vlm_evidence
+    attributes:
+      label: VLM 視覺分析截圖 / 報告連結
+      description: 貼上 VLM 分析截圖、熱像儀影像或系統報告 URL
+
+  - type: textarea
+    id: sensor_data
+    attributes:
+      label: 感測器原始資料（MQTT）
+      description: 相關感測器讀數紀錄
+      render: json
+
+  - type: checkboxes
+    id: safety_check
+    attributes:
+      label: 安全確認清單
+      options:
+        - label: 已確認停機鎖定（LOTO）程序
+          required: false
+        - label: 已通知廠區安全員
+          required: false
+        - label: 已準備緊急停機程序
+          required: false
+        - label: 已確認備品庫存（不足者已申購）
+          required: false

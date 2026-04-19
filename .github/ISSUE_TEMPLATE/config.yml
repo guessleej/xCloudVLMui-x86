@@ -1,0 +1,12 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: 📖 使用說明文件
+    url:  https://github.com/guessleej/xCloudVLMui/wiki
+    about: 查看完整使用說明與 API 文件
+  - name: 💬 技術討論
+    url:  https://github.com/guessleej/xCloudVLMui/discussions
+    about: 一般問題、使用心得、功能討論
+  - name: 📋 變更紀錄
+    url:  https://github.com/guessleej/xCloudVLMui/blob/main/CHANGELOG.md
+    about: 查看各版本功能變更與棄用說明

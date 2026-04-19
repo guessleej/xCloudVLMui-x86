@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MQTT 感測器管理 — 操作手冊</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: "Microsoft JhengHei", "微軟正黑體", "PingFang TC", "Noto Sans TC", sans-serif;
+    background: #f4f6f9;
+    color: #1e293b;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* ── Cover ── */
+  .cover {
+    background: linear-gradient(135deg, #0f172a 0%, #162032 50%, #0a1929 100%);
+    color: #fff;
+    padding: 64px 48px 56px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: "";
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 360px; height: 360px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .cover::after {
+    content: "";
+    position: absolute;
+    bottom: -40px; left: 200px;
+    width: 300px; height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,118,22,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .cover-kicker {
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: #a5b4fc;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  .cover h1 {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 12px;
+    letter-spacing: -0.02em;
+  }
+  .cover-sub {
+    font-size: 16px;
+    color: #94a3b8;
+    margin-bottom: 32px;
+    max-width: 580px;
+  }
+  .cover-meta {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .cover-meta span { font-size: 12px; color: #64748b; }
+  .cover-meta strong { color: #cbd5e1; font-weight: 600; }
+  .cover-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(99,102,241,0.18);
+    border: 1px solid rgba(99,102,241,0.35);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: #c7d2fe;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    margin-bottom: 24px;
+  }
+
+  /* ── Layout ── */
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 32px 80px;
+  }
+
+  /* ── TOC ── */
+  .toc {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 28px 32px;
+    margin-bottom: 40px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .toc h2 {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 16px;
+  }
+  .toc ol {
+    list-style: none;
+    counter-reset: toc;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 24px;
+  }
+  .toc li {
+    counter-increment: toc;
+    font-size: 14px;
+  }
+  .toc li::before {
+    content: counter(toc, decimal-leading-zero) ". ";
+    color: #6366f1;
+    font-weight: 700;
+    font-size: 12px;
+    margin-right: 4px;
+  }
+  .toc a { color: #334155; text-decoration: none; transition: color 0.15s; }
+  .toc a:hover { color: #6366f1; }
+
+  /* ── Section ── */
+  .section { margin-bottom: 52px; }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  .section-num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px; height: 36px;
+    background: #6366f1;
+    color: #fff;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .section-header h2 { font-size: 20px; font-weight: 700; color: #0f172a; flex: 1; }
+  .section-header .badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 3px 8px;
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 28px 0 12px;
+  }
+  h3::before { content: "▎"; color: #6366f1; margin-right: 6px; }
+  p { margin-bottom: 12px; color: #334155; }
+
+  /* ── Card ── */
+  .card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .card-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-desc { font-size: 14px; color: #475569; margin: 0; }
+
+  /* ── Master-Detail diagram ── */
+  .md-diagram {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .md-panel {
+    background: #0f172a;
+    border-radius: 14px;
+    padding: 20px;
+    color: #e2e8f0;
+  }
+  .md-panel-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    margin-bottom: 12px;
+  }
+  .md-device-row {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .md-device-row.active {
+    border-color: rgba(99,102,241,0.4);
+    background: rgba(99,102,241,0.1);
+  }
+  .md-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; flex-shrink: 0; }
+  .md-dot.off { background: #64748b; }
+  .md-detail-section {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #94a3b8;
+  }
+  .md-detail-section strong { display: block; color: #e2e8f0; font-size: 11px; margin-bottom: 4px; }
+
+  /* ── Info grid ── */
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .info-grid.col3 { grid-template-columns: repeat(3, 1fr); }
+  .info-grid.col4 { grid-template-columns: repeat(4, 1fr); }
+  .info-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .info-box .label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    margin-bottom: 4px;
+  }
+  .info-box .value { font-size: 15px; font-weight: 700; color: #0f172a; }
+  .info-box .desc { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+  /* ── Steps ── */
+  .steps { counter-reset: step; list-style: none; padding: 0; }
+  .steps li {
+    counter-increment: step;
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  .steps li:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 17px; top: 38px;
+    width: 2px;
+    bottom: -12px;
+    background: #e2e8f0;
+  }
+  .step-num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: #eef2ff;
+    border: 2px solid #6366f1;
+    color: #6366f1;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+    z-index: 1;
+  }
+  .step-content { flex: 1; padding-top: 6px; }
+  .step-content strong { display: block; font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+  .step-content p { font-size: 14px; color: #475569; margin: 0; }
+
+  /* ── Table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    font-size: 14px;
+  }
+  thead tr { background: #0f172a; color: #fff; }
+  thead th {
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  tbody tr { border-bottom: 1px solid #f1f5f9; }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  tbody tr:hover { background: #f0f4ff; }
+  td { padding: 11px 16px; color: #334155; vertical-align: top; }
+  td:first-child { font-weight: 600; color: #0f172a; }
+
+  /* ── Code ── */
+  code {
+    background: #1e293b;
+    color: #e2e8f0;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-family: "Courier New", monospace;
+    font-size: 13px;
+  }
+  .code-block {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 16px;
+    font-family: "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-x: auto;
+    border: 1px solid #1e293b;
+  }
+  .code-block .comment { color: #64748b; }
+  .code-block .key { color: #a5b4fc; }
+  .code-block .val { color: #4ade80; }
+  .code-block .str { color: #86efac; }
+
+  /* ── Pill ── */
+  .pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .pill-ok     { background: #dcfce7; color: #166534; }
+  .pill-warn   { background: #fef9c3; color: #854d0e; }
+  .pill-danger { background: #fee2e2; color: #991b1b; }
+  .pill-info   { background: #e0f2fe; color: #075985; }
+  .pill-purple { background: #f5f3ff; color: #5b21b6; border: 1px solid #ddd6fe; }
+
+  /* ── Note / Warning ── */
+  .note {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-left: 4px solid #3b82f6;
+    border-radius: 0 10px 10px 0;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 14px;
+    color: #1e40af;
+  }
+  .note strong { display: block; margin-bottom: 4px; font-size: 13px; }
+  .warning {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-left: 4px solid #f59e0b;
+    border-radius: 0 10px 10px 0;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 14px;
+    color: #92400e;
+  }
+  .warning strong { display: block; margin-bottom: 4px; font-size: 13px; }
+
+  /* ── Threshold visual ── */
+  .thresh-vis {
+    position: relative;
+    height: 56px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 16px 0;
+  }
+  .thresh-band {
+    position: absolute;
+    top: 0; bottom: 0;
+  }
+  .thresh-band.danger { background: rgba(239,68,68,0.12); }
+  .thresh-band.warn   { background: rgba(245,158,11,0.12); }
+  .thresh-band.ok     { background: rgba(34,197,94,0.12); }
+  .thresh-label {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+  }
+  .thresh-line {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 2px;
+  }
+  .thresh-line.red    { background: #ef4444; }
+  .thresh-line.amber  { background: #f59e0b; }
+
+  /* ── Chart tab ── */
+  .sensor-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .sensor-tab {
+    padding: 5px 12px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    cursor: default;
+  }
+  .sensor-tab.active {
+    background: #6366f1;
+    border-color: #6366f1;
+    color: #fff;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    background: #0f172a;
+    color: #475569;
+    text-align: center;
+    padding: 28px;
+    font-size: 12px;
+    margin-top: 60px;
+  }
+  .footer strong { color: #94a3b8; }
+
+  @media print {
+    .cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    thead tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .md-panel { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
+  @media (max-width: 640px) {
+    .cover { padding: 40px 24px; }
+    .container { padding: 32px 16px 60px; }
+    .info-grid, .info-grid.col3, .info-grid.col4 { grid-template-columns: 1fr; }
+    .toc ol { grid-template-columns: 1fr; }
+    .md-diagram { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ Cover ══════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-kicker">xCloud VLM Console — 操作手冊</div>
+  <div class="cover-badge">Device Management</div>
+  <h1>MQTT 感測器管理</h1>
+  <p class="cover-sub">管理所有已登錄的 MQTT 感測設備，設定警報閾值、查看歷史趨勢圖表，以及對設備進行完整的新增、編輯、刪除操作。</p>
+  <div class="cover-meta">
+    <span><strong>模組</strong>：感測器管理（MGT）</span>
+    <span><strong>路徑</strong>：/main/mqtt-devices</span>
+    <span><strong>適用人員</strong>：設備工程師、系統整合人員、維護主管</span>
+    <span><strong>版本</strong>：v1.0</span>
+  </div>
+</div>
+
+<!-- ══ Body ════════════════════════════════════════════════════════════════ -->
+<div class="container">
+
+  <!-- TOC -->
+  <div class="toc">
+    <h2>目錄</h2>
+    <ol>
+      <li><a href="#s1">模組概覽</a></li>
+      <li><a href="#s2">頁面佈局：Master-Detail</a></li>
+      <li><a href="#s3">統計摘要列</a></li>
+      <li><a href="#s4">設備清單（左側）</a></li>
+      <li><a href="#s5">設備詳情面板（右側）</a></li>
+      <li><a href="#s6">歷史趨勢圖</a></li>
+      <li><a href="#s7">新增設備</a></li>
+      <li><a href="#s8">編輯設備資訊</a></li>
+      <li><a href="#s9">刪除設備</a></li>
+      <li><a href="#s10">警報閾值管理</a></li>
+      <li><a href="#s11">支援感測器類型</a></li>
+      <li><a href="#s12">與監控頁面的關係</a></li>
+      <li><a href="#s13">常見問題排查</a></li>
+    </ol>
+  </div>
+
+  <!-- ── 01 模組概覽 ─────────────────────────────────────── -->
+  <div class="section" id="s1">
+    <div class="section-header">
+      <div class="section-num">01</div>
+      <h2>模組概覽</h2>
+      <span class="badge">Overview</span>
+    </div>
+    <p>MQTT 感測器管理頁面（<strong>/main/mqtt-devices</strong>）是 xCloud VLM Console 的設備後台管理中心。此頁面提供完整的設備生命週期管理功能，包含設備登錄、資訊編輯、歷史資料查看與警報閾值設定。</p>
+
+    <div class="info-grid col4">
+      <div class="info-box">
+        <div class="label">核心功能</div>
+        <div class="value">設備 CRUD</div>
+        <div class="desc">新增、查看、編輯、刪除設備</div>
+      </div>
+      <div class="info-box">
+        <div class="label">歷史資料</div>
+        <div class="value">趨勢圖</div>
+        <div class="desc">最近 80 筆感測數值曲線</div>
+      </div>
+      <div class="info-box">
+        <div class="label">警報設定</div>
+        <div class="value">四層閾值</div>
+        <div class="desc">危急下限/上限 + 警告下限/上限</div>
+      </div>
+      <div class="info-box">
+        <div class="label">佈局形式</div>
+        <div class="value">Master-Detail</div>
+        <div class="desc">左側清單 + 右側詳情</div>
+      </div>
+    </div>
+
+    <h3>與監控頁面的定位差異</h3>
+    <table>
+      <thead>
+        <tr><th>功能</th><th>監控頁面（/main/mqtt）</th><th>管理頁面（本頁）</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>主要對象</td><td>現場監控人員</td><td>設備工程師、系統整合</td></tr>
+        <tr><td>核心用途</td><td>即時觀看感測數值</td><td>設備設定與維護管理</td></tr>
+        <tr><td>資料刷新</td><td>每 5 秒自動刷新</td><td>手動刷新（點選後更新）</td></tr>
+        <tr><td>設備操作</td><td>快速新增、刪除</td><td>完整 CRUD + 閾值設定 + 圖表</td></tr>
+        <tr><td>歷史資料</td><td>不提供</td><td>提供趨勢圖（最近 80 筆）</td></tr>
+        <tr><td>閾值設定</td><td>不提供</td><td>提供四層閾值 CRUD</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── 02 頁面佈局 ─────────────────────────────────────── -->
+  <div class="section" id="s2">
+    <div class="section-header">
+      <div class="section-num">02</div>
+      <h2>頁面佈局：Master-Detail</h2>
+      <span class="badge">Layout</span>
+    </div>
+    <p>本頁採用 Master-Detail 雙欄佈局，左側為設備清單（Master），右側為選定設備的詳細資訊（Detail）。</p>
+
+    <div class="md-diagram">
+      <div class="md-panel">
+        <div class="md-panel-title">左側：設備清單</div>
+        <div class="md-device-row active">
+          <div class="md-dot"></div>
+          壓縮機 #1 <small style="color:#64748b;margin-left:auto;">Online</small>
+        </div>
+        <div class="md-device-row">
+          <div class="md-dot off"></div>
+          馬達 A <small style="color:#64748b;margin-left:auto;">Offline</small>
+        </div>
+        <div class="md-device-row">
+          <div class="md-dot"></div>
+          幫浦 02 <small style="color:#64748b;margin-left:auto;">Online</small>
+        </div>
+      </div>
+      <div class="md-panel">
+        <div class="md-panel-title">右側：設備詳情（點選左側設備後顯示）</div>
+        <div class="md-detail-section">
+          <strong>設備資訊</strong>
+          設備 ID、類型、位置、最後回傳時間、累計讀值數
+        </div>
+        <div class="md-detail-section">
+          <strong>歷史趨勢圖</strong>
+          感測器切換 Tab + AreaChart 折線圖（含閾值參考線）
+        </div>
+        <div class="md-detail-section">
+          <strong>警報閾值設定</strong>
+          已設定的閾值列表 + 新增閾值表單
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <strong>初次使用</strong>
+      頁面載入後右側顯示「選擇一台設備」的提示。請先點選左側清單中的任一設備，右側即會顯示完整詳情。
+    </div>
+  </div>
+
+  <!-- ── 03 統計摘要列 ──────────────────────────────────── -->
+  <div class="section" id="s3">
+    <div class="section-header">
+      <div class="section-num">03</div>
+      <h2>統計摘要列</h2>
+      <span class="badge">Stats</span>
+    </div>
+    <p>頁面上方的四格統計卡片，顯示整體設備狀況概覽。</p>
+
+    <div class="info-grid col4">
+      <div class="info-box">
+        <div class="label">已登錄設備</div>
+        <div class="value">N 台</div>
+        <div class="desc">系統中已登錄的 MQTT 設備總數</div>
+      </div>
+      <div class="info-box">
+        <div class="label">Online</div>
+        <div class="value" style="color:#16a34a;">N 台</div>
+        <div class="desc">目前在線（最近有回傳資料）的設備數</div>
+      </div>
+      <div class="info-box">
+        <div class="label">Offline</div>
+        <div class="value" style="color:#d97706;">N 台</div>
+        <div class="desc">目前離線（未收到新資料）的設備數</div>
+      </div>
+      <div class="info-box">
+        <div class="label">閾值設定</div>
+        <div class="value">N 組</div>
+        <div class="desc">目前選定設備的閾值設定總數（未選設備顯示 —）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 04 設備清單（左側） ────────────────────────────── -->
+  <div class="section" id="s4">
+    <div class="section-header">
+      <div class="section-num">04</div>
+      <h2>設備清單（左側）</h2>
+      <span class="badge">Master Panel</span>
+    </div>
+    <p>左側面板列出所有已登錄設備，每列設備可進行選取與刪除。</p>
+
+    <h3>設備列資訊</h3>
+    <table>
+      <thead>
+        <tr><th>資訊項目</th><th>說明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>設備名稱</td><td>顯示名稱，較大字體顯示於第一行</td></tr>
+        <tr><td>設備 ID</td><td>MQTT Topic 識別碼，顯示於名稱下方（較小字）</td></tr>
+        <tr><td>設備類型</td><td>右側顯示設備分類（sensor / compressor / motor 等）</td></tr>
+        <tr><td>安裝位置</td><td>顯示設定的安裝位置（若有）</td></tr>
+        <tr><td>在線狀態</td><td><span class="pill pill-ok">Online</span> 或 <span class="pill pill-warn">Offline</span> 標籤</td></tr>
+        <tr><td>最後回傳</td><td>最後收到感測資料的相對時間（x 秒/分鐘/小時前）</td></tr>
+        <tr><td>刪除按鈕</td><td>🗑 垃圾桶圖示，點選後確認刪除</td></tr>
+      </tbody>
+    </table>
+
+    <h3>選取設備</h3>
+    <p>點選清單中任一設備列，右側即顯示該設備的詳情面板。被選取的設備列會有高亮邊框。</p>
+
+    <h3>清單標題計數</h3>
+    <p>清單上方顯示「設備清單（N）」，括號內為目前登錄的設備總數。</p>
+  </div>
+
+  <!-- ── 05 設備詳情面板（右側） ───────────────────────── -->
+  <div class="section" id="s5">
+    <div class="section-header">
+      <div class="section-num">05</div>
+      <h2>設備詳情面板（右側）</h2>
+      <span class="badge">Detail Panel</span>
+    </div>
+    <p>從左側清單點選設備後，右側顯示該設備的完整詳情，分為三個子區塊。</p>
+
+    <h3>詳情面板頂列</h3>
+    <p>顯示設備名稱、在線狀態，以及兩個操作按鈕：</p>
+    <div class="info-grid">
+      <div class="info-box">
+        <div class="label">編輯按鈕</div>
+        <div class="value">✏️ 編輯</div>
+        <div class="desc">開啟編輯設備對話框，可修改名稱、類型、位置、Topic 前綴、備註</div>
+      </div>
+      <div class="info-box">
+        <div class="label">刷新按鈕</div>
+        <div class="value">↻ 刷新</div>
+        <div class="desc">重新向後端取得本設備的最新詳情資料（含閾值、感測類型）</div>
+      </div>
+    </div>
+
+    <h3>設備資訊格</h3>
+    <p>以六格資訊卡片呈現設備基本資料：</p>
+    <table>
+      <thead>
+        <tr><th>資訊項目</th><th>說明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>設備 ID</td><td>登錄時設定的唯一識別碼（不可修改）</td></tr>
+        <tr><td>設備類型</td><td>設備分類，例：compressor、motor</td></tr>
+        <tr><td>安裝位置</td><td>設備的實體位置描述</td></tr>
+        <tr><td>最後回傳</td><td>最後一次收到 MQTT 訊息的相對時間</td></tr>
+        <tr><td>感測器類型</td><td>該設備曾回傳過資料的感測器類型清單（自動偵測）</td></tr>
+        <tr><td>累計讀值</td><td>資料庫中該設備的歷史感測資料總筆數</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── 06 歷史趨勢圖 ──────────────────────────────────── -->
+  <div class="section" id="s6">
+    <div class="section-header">
+      <div class="section-num">06</div>
+      <h2>歷史趨勢圖</h2>
+      <span class="badge">Chart</span>
+    </div>
+    <p>在設備詳情面板的中間區域，提供感測器歷史數值的面積折線圖，最多顯示最近 80 筆資料。</p>
+
+    <h3>感測器類型切換</h3>
+    <p>若設備有多種感測器類型，可透過上方的感測器 Tab 切換查看不同類型的歷史圖表：</p>
+    <div class="sensor-tabs">
+      <span class="sensor-tab active">🌡 溫度</span>
+      <span class="sensor-tab">〰 振動</span>
+      <span class="sensor-tab">⬡ 壓力</span>
+    </div>
+    <p>點選不同 Tab 後，圖表資料會自動載入切換後的感測類型資料。</p>
+
+    <h3>圖表說明</h3>
+    <table>
+      <thead>
+        <tr><th>圖表元素</th><th>說明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>面積曲線</td><td>以漸層填色面積圖呈現數值趨勢，不同感測器有對應顏色</td></tr>
+        <tr><td>X 軸</td><td>時間軸，顯示感測資料的記錄時間</td></tr>
+        <tr><td>Y 軸</td><td>數值軸，自動依資料範圍縮放</td></tr>
+        <tr><td>閾值參考線</td><td>若已設定警報閾值，圖表上會顯示對應的橫向參考線（紅色/橘色）</td></tr>
+        <tr><td>懸停提示</td><td>滑鼠停在圖表上，顯示該時間點的確切數值</td></tr>
+      </tbody>
+    </table>
+
+    <h3>閾值參考線顏色</h3>
+    <div class="info-grid col4">
+      <div class="info-box">
+        <div class="label">危急下限</div>
+        <div class="value" style="color:#ef4444;">─── 紅色</div>
+        <div class="desc">min_value，低於此值為危急</div>
+      </div>
+      <div class="info-box">
+        <div class="label">警告下限</div>
+        <div class="value" style="color:#f59e0b;">─── 橘色</div>
+        <div class="desc">warn_min，低於此值為警告</div>
+      </div>
+      <div class="info-box">
+        <div class="label">警告上限</div>
+        <div class="value" style="color:#f59e0b;">─── 橘色</div>
+        <div class="desc">warn_max，高於此值為警告</div>
+      </div>
+      <div class="info-box">
+        <div class="label">危急上限</div>
+        <div class="value" style="color:#ef4444;">─── 紅色</div>
+        <div class="desc">max_value，高於此值為危急</div>
+      </div>
+    </div>
+
+    <div class="note">
+      <strong>提示</strong>
+      若設備尚未回傳任何資料，圖表區域會顯示空白並提示「無資料」。確認感測器已開始回傳訊息後再查看圖表。
+    </div>
+  </div>
+
+  <!-- ── 07 新增設備 ─────────────────────────────────────── -->
+  <div class="section" id="s7">
+    <div class="section-header">
+      <div class="section-num">07</div>
+      <h2>新增設備</h2>
+      <span class="badge">Add Device</span>
+    </div>
+    <p>新增設備後，感測器即可透過 MQTT 發送資料並自動對應到此設備。</p>
+
+    <h3>操作步驟</h3>
+    <ol class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <strong>點選右上角「＋ 新增設備」</strong>
+          <p>開啟新增設備對話框。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <strong>填寫設備 ID（必填）</strong>
+          <p>用於 MQTT Topic 中的識別碼，全系統唯一。建議格式：英文小寫 + 底線 + 序號，例：<code>compressor_01</code>。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <strong>填寫顯示名稱（必填）</strong>
+          <p>頁面顯示用的中文名稱，例：壓縮機 #1。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <strong>設定設備類型、安裝位置（選填）</strong>
+          <p>設備類型選項：sensor / compressor / motor / pump / conveyor / cooler / panel / plc / other。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <strong>填寫 Topic 前綴（必填）</strong>
+          <p>MQTT 主題前綴，格式為 <code>xcloud/{device_id}</code>。此前綴加上 <code>/{sensor_type}</code> 即為完整 Topic。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <strong>點選「確認新增」完成</strong>
+          <p>設備新增後自動出現在左側清單。接著可至警報閾值區塊設定各感測器的告警條件。</p>
+        </div>
+      </li>
+    </ol>
+
+    <table>
+      <thead>
+        <tr><th>欄位</th><th>必填</th><th>規則</th><th>範例</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>設備 ID</td><td><span class="pill pill-danger">必填</span></td><td>英文小寫、數字、底線；全系統唯一；建立後不可改</td><td>compressor_01</td></tr>
+        <tr><td>顯示名稱</td><td><span class="pill pill-danger">必填</span></td><td>任意字串</td><td>壓縮機 #1</td></tr>
+        <tr><td>設備類型</td><td><span class="pill pill-info">選填</span></td><td>下拉選單選擇</td><td>compressor</td></tr>
+        <tr><td>安裝位置</td><td><span class="pill pill-info">選填</span></td><td>任意字串</td><td>廠房 A 區域 1</td></tr>
+        <tr><td>Topic 前綴</td><td><span class="pill pill-danger">必填</span></td><td>格式 xcloud/{device_id}</td><td>xcloud/compressor_01</td></tr>
+        <tr><td>備註</td><td><span class="pill pill-info">選填</span></td><td>任意文字說明</td><td>主線壓縮機，型號 ABC-300</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── 08 編輯設備資訊 ────────────────────────────────── -->
+  <div class="section" id="s8">
+    <div class="section-header">
+      <div class="section-num">08</div>
+      <h2>編輯設備資訊</h2>
+      <span class="badge">Edit Device</span>
+    </div>
+    <p>可修改設備的顯示名稱、類型、安裝位置、Topic 前綴與備註（設備 ID 不可修改）。</p>
+
+    <h3>操作步驟</h3>
+    <ol class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <strong>在左側清單點選要編輯的設備</strong>
+          <p>右側會顯示該設備的詳情面板。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <strong>點選詳情面板右上角的「✏️ 編輯」按鈕</strong>
+          <p>開啟編輯對話框，欄位已預先填入目前的設備資訊。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <strong>修改需要更新的欄位</strong>
+          <p>可修改：顯示名稱、設備類型、安裝位置、Topic 前綴、備註。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <strong>點選「儲存」完成</strong>
+          <p>更新成功後對話框關閉，詳情面板自動刷新顯示最新資訊。</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="warning">
+      <strong>注意</strong>
+      設備 ID 建立後不可修改。若 Topic 前綴發生變更，須確認實際感測器的發送 Topic 也同步更新，否則新資料將無法對應到此設備。
+    </div>
+  </div>
+
+  <!-- ── 09 刪除設備 ─────────────────────────────────────── -->
+  <div class="section" id="s9">
+    <div class="section-header">
+      <div class="section-num">09</div>
+      <h2>刪除設備</h2>
+      <span class="badge">Delete Device</span>
+    </div>
+
+    <p>可從左側清單刪除設備，刪除後該設備的所有歷史資料與閾值設定將一併移除。</p>
+
+    <ol class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <strong>找到左側清單中要刪除的設備列</strong>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <strong>點選該列右側的 🗑 垃圾桶圖示</strong>
+          <p>彈出確認對話框：「確定刪除『設備名稱』？所有感測資料將一併移除。」</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <strong>點選「確定」</strong>
+          <p>設備從清單中移除，若右側正在顯示該設備的詳情，右側會回到「選擇一台設備」的空白狀態。</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="warning">
+      <strong>警告：此操作無法復原</strong>
+      刪除設備時，以下資料將永久移除：① 設備基本資訊 ② 所有歷史感測讀值（mqtt_sensor_readings） ③ 所有警報閾值設定（mqtt_alert_thresholds）。請在刪除前確認資料已備份或不再需要。
+    </div>
+  </div>
+
+  <!-- ── 10 警報閾值管理 ────────────────────────────────── -->
+  <div class="section" id="s10">
+    <div class="section-header">
+      <div class="section-num">10</div>
+      <h2>警報閾值管理</h2>
+      <span class="badge">Thresholds</span>
+    </div>
+    <p>在設備詳情面板的下方區塊，可為每種感測器類型設定四層警報閾值，設定完成後閾值會以參考線顯示在歷史趨勢圖上。</p>
+
+    <h3>四層閾值結構</h3>
+    <p>從低到高依序為四個層級，每台設備、每種感測器可獨立設定：</p>
+
+    <!-- Threshold visual -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin:16px 0;">
+      <div style="position:relative;height:40px;background:linear-gradient(to right,#fee2e2 0%,#fee2e2 15%,#fef3c7 15%,#fef3c7 30%,#dcfce7 30%,#dcfce7 70%,#fef3c7 70%,#fef3c7 85%,#fee2e2 85%,#fee2e2 100%);border-radius:8px;overflow:hidden;">
+        <span style="position:absolute;left:7%;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;color:#991b1b;">危急</span>
+        <span style="position:absolute;left:20%;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;color:#92400e;">警告</span>
+        <span style="position:absolute;left:47%;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;color:#166534;">正常</span>
+        <span style="position:absolute;left:74%;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;color:#92400e;">警告</span>
+        <span style="position:absolute;left:89%;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;color:#991b1b;">危急</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:#64748b;padding:0 4px;">
+        <span style="color:#ef4444;font-weight:700;">↑ min_value（危急下限）</span>
+        <span style="color:#f59e0b;font-weight:700;">↑ warn_min（警告下限）</span>
+        <span style="color:#f59e0b;font-weight:700;">warn_max（警告上限）↑</span>
+        <span style="color:#ef4444;font-weight:700;">max_value（危急上限）↑</span>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>欄位名稱</th><th>中文</th><th>說明</th><th>圖表線色</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>min_value</td><td>危急下限</td><td>低於此值為危急狀態，需立即處理</td><td><span style="color:#ef4444;font-weight:700;">紅色</span></td></tr>
+        <tr><td>warn_min</td><td>警告下限</td><td>低於此值進入警告區間，需關注</td><td><span style="color:#f59e0b;font-weight:700;">橘色</span></td></tr>
+        <tr><td>warn_max</td><td>警告上限</td><td>高於此值進入警告區間，需關注</td><td><span style="color:#f59e0b;font-weight:700;">橘色</span></td></tr>
+        <tr><td>max_value</td><td>危急上限</td><td>高於此值為危急狀態，需立即處理</td><td><span style="color:#ef4444;font-weight:700;">紅色</span></td></tr>
+      </tbody>
+    </table>
+
+    <h3>新增閾值步驟</h3>
+    <ol class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <strong>點選「＋ 新增閾值」按鈕</strong>
+          <p>位於警報閾值區塊右上角，點選後展開新增表單。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <strong>選擇感測器類型（必填）</strong>
+          <p>從下拉選單選擇要設定的感測器類型，例：temperature、vibration、pressure 等。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <strong>填寫單位（選填）</strong>
+          <p>例如：°C、bar、mm/s、rpm。此欄位僅作為顯示標示，不影響邏輯判斷。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <strong>填寫四個閾值數值（依需求填寫）</strong>
+          <p>危急下限、警告下限、警告上限、危急上限。不填寫的欄位留空即可，系統不會設定該層閾值。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <strong>設定啟用狀態（預設啟用）</strong>
+          <p>可選擇「啟用」或「停用」。停用的閾值不會顯示在圖表上。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <strong>點選「儲存」</strong>
+          <p>閾值儲存後，圖表上立即出現對應的參考線，閾值列表也會新增此筆記錄。</p>
+        </div>
+      </li>
+    </ol>
+
+    <h3>刪除閾值</h3>
+    <p>在已設定的閾值列表中，每列右側有 🗑 刪除圖示。點選後，該閾值設定與對應的圖表參考線會同時移除。</p>
+
+    <div class="note">
+      <strong>建議設定方式</strong>
+      以溫度感測器為例（設備正常運作溫度 40–70°C）：<br/>
+      危急下限（min_value）= 20°C　　警告下限（warn_min）= 35°C<br/>
+      警告上限（warn_max）= 75°C　　危急上限（max_value）= 90°C
+    </div>
+  </div>
+
+  <!-- ── 11 支援感測器類型 ───────────────────────────────── -->
+  <div class="section" id="s11">
+    <div class="section-header">
+      <div class="section-num">11</div>
+      <h2>支援感測器類型</h2>
+      <span class="badge">Sensor Types</span>
+    </div>
+    <p>本頁面的感測器類型選單支援以下 10 種常見工業感測器，同時也可接受任何自訂類型（以灰色預設樣式顯示）。</p>
+
+    <table>
+      <thead>
+        <tr><th>類型（英文）</th><th>中文</th><th>圖示顏色</th><th>圖表線色</th><th>常用單位</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>temperature</td><td>溫度</td><td>🟠 橘色</td><td style="color:#fb923c;">橘色</td><td>°C、°F</td></tr>
+        <tr><td>vibration</td><td>振動</td><td>🟣 紫色</td><td style="color:#c084fc;">紫色</td><td>mm/s、g</td></tr>
+        <tr><td>pressure</td><td>壓力</td><td>🔵 藍色</td><td style="color:#60a5fa;">藍色</td><td>bar、kPa</td></tr>
+        <tr><td>rpm</td><td>轉速</td><td>🩵 青色</td><td style="color:#22d3ee;">青色</td><td>rpm</td></tr>
+        <tr><td>humidity</td><td>濕度</td><td>🩵 綠青色</td><td style="color:#2dd4bf;">綠青色</td><td>%RH</td></tr>
+        <tr><td>voltage</td><td>電壓</td><td>🟡 黃色</td><td style="color:#facc15;">黃色</td><td>V、kV</td></tr>
+        <tr><td>current</td><td>電流</td><td>🟡 琥珀色</td><td style="color:#fbbf24;">琥珀色</td><td>A</td></tr>
+        <tr><td>power</td><td>功率</td><td>🔴 紅色</td><td style="color:#f87171;">紅色</td><td>W、kW</td></tr>
+        <tr><td>flow</td><td>流量</td><td>🩵 天藍色</td><td style="color:#38bdf8;">天藍色</td><td>L/min</td></tr>
+        <tr><td>level</td><td>液位</td><td>🟣 靛色</td><td style="color:#818cf8;">靛色</td><td>m、%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── 12 與監控頁面的關係 ────────────────────────────── -->
+  <div class="section" id="s12">
+    <div class="section-header">
+      <div class="section-num">12</div>
+      <h2>與監控頁面的關係</h2>
+      <span class="badge">Relation</span>
+    </div>
+    <p>管理頁面（本頁）與監控頁面（/main/mqtt）共用同一份資料庫，兩者互相連動：</p>
+
+    <table>
+      <thead>
+        <tr><th>在管理頁面做的事</th><th>在監控頁面的效果</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>新增設備</td><td>監控頁面的設備卡片列表新增對應卡片</td></tr>
+        <tr><td>修改設備顯示名稱</td><td>監控頁面卡片標題更新為新名稱（下次刷新後）</td></tr>
+        <tr><td>刪除設備</td><td>監控頁面卡片消失，相關歷史讀值移除</td></tr>
+        <tr><td>設定警報閾值</td><td>（監控頁面目前不顯示閾值，僅在管理頁圖表呈現）</td></tr>
+      </tbody>
+    </table>
+
+    <h3>建議工作流程</h3>
+    <ol class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <strong>在管理頁面登錄新設備</strong>
+          <p>填寫設備 ID、名稱、類型、安裝位置、Topic 前綴。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <strong>啟動實際感測器，確認資料傳入</strong>
+          <p>至監控頁面觀看設備卡片，確認感測數值已出現。或使用監控頁面的「測試發佈」功能驗證資料管道。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <strong>回到管理頁面設定警報閾值</strong>
+          <p>點選設備 → 在警報閾值區塊設定各感測器的四層閾值。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <strong>確認趨勢圖與閾值參考線正確顯示</strong>
+          <p>圖表上的閾值線符合設定值，代表整體設定完成。</p>
+        </div>
+      </li>
+    </ol>
+  </div>
+
+  <!-- ── 13 常見問題排查 ─────────────────────────────────── -->
+  <div class="section" id="s13">
+    <div class="section-header">
+      <div class="section-num">13</div>
+      <h2>常見問題排查</h2>
+      <span class="badge">Troubleshoot</span>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>問題現象</th><th>可能原因</th><th>解決方式</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>新增設備後清單沒有更新</td>
+          <td>新增後頁面刷新有短暫延遲</td>
+          <td>點選右上角「↻ 刷新」按鈕手動更新清單</td>
+        </tr>
+        <tr>
+          <td>點選設備後右側一直轉圈</td>
+          <td>後端 API 載入詳情資料中，或網路異常</td>
+          <td>等待幾秒後點選「↻ 刷新」；若持續失敗確認後端容器是否正常運行</td>
+        </tr>
+        <tr>
+          <td>歷史圖表無資料顯示</td>
+          <td>該設備尚未接收到 MQTT 訊息</td>
+          <td>確認感測器已連線並發送資料；至監控頁面使用「測試發佈」驗證</td>
+        </tr>
+        <tr>
+          <td>閾值設定後圖表無參考線</td>
+          <td>目前查看的感測器 Tab 與閾值設定的類型不同</td>
+          <td>切換至閾值設定對應的感測器 Tab，圖表參考線即出現</td>
+        </tr>
+        <tr>
+          <td>設備類型下拉選單沒有想要的選項</td>
+          <td>系統預設類型不含此類型</td>
+          <td>選擇最接近的類型（如 other）即可，顯示名稱可自由設定</td>
+        </tr>
+        <tr>
+          <td>新增閾值後顯示「新增失敗」</td>
+          <td>同一設備的同一感測器類型已有閾值設定，或欄位格式錯誤</td>
+          <td>確認感測器類型未選擇重複；數值欄位只能填寫數字</td>
+        </tr>
+        <tr>
+          <td>設備顯示 Offline</td>
+          <td>感測器未發送資料，或 Topic 不符合</td>
+          <td>確認感測器 Topic 格式為 <code>xcloud/{device_id}/{sensor_type}</code> 且 device_id 完全符合</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- ══ Footer ══════════════════════════════════════════════════════════════ -->
+<div class="footer">
+  <strong>xCloud VLM Console</strong> — MQTT 感測器管理操作手冊 v1.0<br />
+  模組：感測器管理（MGT）　路徑：/main/mqtt-devices　適用版本：xcloudvlmui v1.0+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,28 @@
+# xCloudVLMui Platform — 開發 / 測試依賴
+# 安裝：pip install -r requirements-dev.txt
+# 注意：本檔案不含正式依賴；正式依賴請看 requirements.txt
+
+# ── 測試框架 ──────────────────────────────────────────────────────────
+pytest>=8.2.0
+pytest-asyncio>=0.23.8
+anyio[trio]>=4.4.0          # pytest-asyncio anyio 後端
+httpx>=0.27.0               # AsyncClient for FastAPI integration tests
+aiosqlite>=0.20.0           # in-memory SQLite for tests
+pytest-cov>=5.0.0           # 測試覆蓋率報告（--cov=. --cov-report=html）
+pytest-xdist>=3.5.0         # 平行執行測試（-n auto）
+respx>=0.21.0               # httpx mock for external HTTP calls
+
+# ── 程式碼品質 ────────────────────────────────────────────────────────
+ruff>=0.4.0                 # Linter + formatter（取代 flake8 + isort）
+black>=24.4.0               # 程式碼格式化
+mypy>=1.10.0                # 靜態型別檢查
+
+# ── 型別存根 ──────────────────────────────────────────────────────────
+types-requests>=2.31.0
+sqlalchemy[mypy]>=2.0.0
+types-pyyaml>=6.0.0
+
+# ── 開發工具 ──────────────────────────────────────────────────────────
+ipython>=8.24.0             # 互動式 shell
+watchfiles>=0.21.0          # 檔案變更監控（uvicorn --reload 依賴）
+pre-commit>=3.7.0           # Git pre-commit hooks（ruff + black + mypy）

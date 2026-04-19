@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MQTT 感測器監控 — 操作手冊</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: "Microsoft JhengHei", "微軟正黑體", "PingFang TC", "Noto Sans TC", sans-serif;
+    background: #f4f6f9;
+    color: #1e293b;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* ── Cover ── */
+  .cover {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0c1a2e 100%);
+    color: #fff;
+    padding: 64px 48px 56px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: "";
+    position: absolute;
+    top: -80px; right: -80px;
+    width: 400px; height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,118,22,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .cover-kicker {
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: #ff7616;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  .cover h1 {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 12px;
+    letter-spacing: -0.02em;
+  }
+  .cover-sub {
+    font-size: 16px;
+    color: #94a3b8;
+    margin-bottom: 32px;
+    max-width: 540px;
+  }
+  .cover-meta {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .cover-meta span {
+    font-size: 12px;
+    color: #64748b;
+  }
+  .cover-meta strong {
+    color: #cbd5e1;
+    font-weight: 600;
+  }
+  .cover-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,118,22,0.15);
+    border: 1px solid rgba(255,118,22,0.3);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: #ffb07a;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    margin-bottom: 24px;
+  }
+
+  /* ── Layout ── */
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 48px 32px 80px;
+  }
+
+  /* ── TOC ── */
+  .toc {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 28px 32px;
+    margin-bottom: 40px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .toc h2 {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 16px;
+  }
+  .toc ol {
+    list-style: none;
+    counter-reset: toc;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 24px;
+  }
+  .toc li {
+    counter-increment: toc;
+    font-size: 14px;
+  }
+  .toc li::before {
+    content: counter(toc, decimal-leading-zero) ". ";
+    color: #ff7616;
+    font-weight: 700;
+    font-size: 12px;
+    margin-right: 4px;
+  }
+  .toc a {
+    color: #334155;
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .toc a:hover { color: #ff7616; }
+
+  /* ── Section ── */
+  .section {
+    margin-bottom: 48px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  .section-num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px; height: 36px;
+    background: #ff7616;
+    color: #fff;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .section-header h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #0f172a;
+    flex: 1;
+  }
+  .section-header .badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 3px 8px;
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 28px 0 12px;
+  }
+  h3::before {
+    content: "▎";
+    color: #ff7616;
+    margin-right: 6px;
+  }
+  p { margin-bottom: 12px; color: #334155; }
+
+  /* ── Card ── */
+  .card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .card-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-desc { font-size: 14px; color: #475569; margin: 0; }
+
+  /* ── Info grid ── */
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .info-grid.col3 { grid-template-columns: repeat(3, 1fr); }
+  .info-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .info-box .label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    margin-bottom: 4px;
+  }
+  .info-box .value {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  .info-box .desc { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+  /* ── Steps ── */
+  .steps {
+    counter-reset: step;
+    list-style: none;
+    padding: 0;
+  }
+  .steps li {
+    counter-increment: step;
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  .steps li:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 17px; top: 38px;
+    width: 2px;
+    bottom: -12px;
+    background: #e2e8f0;
+  }
+  .step-num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: #fff0e6;
+    border: 2px solid #ff7616;
+    color: #ff7616;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+    z-index: 1;
+  }
+  .step-content { flex: 1; padding-top: 6px; }
+  .step-content strong {
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 4px;
+  }
+  .step-content p { font-size: 14px; color: #475569; margin: 0; }
+
+  /* ── Table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    font-size: 14px;
+  }
+  thead tr { background: #0f172a; color: #fff; }
+  thead th {
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  tbody tr { border-bottom: 1px solid #f1f5f9; }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  tbody tr:hover { background: #fff7f0; }
+  td { padding: 11px 16px; color: #334155; vertical-align: top; }
+  td:first-child { font-weight: 600; color: #0f172a; }
+
+  /* ── Code ── */
+  code {
+    background: #1e293b;
+    color: #e2e8f0;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-family: "Courier New", monospace;
+    font-size: 13px;
+  }
+  .code-block {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 16px;
+    font-family: "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-x: auto;
+    border: 1px solid #1e293b;
+  }
+  .code-block .comment { color: #64748b; }
+  .code-block .key { color: #ff7616; }
+  .code-block .val { color: #4ade80; }
+  .code-block .str { color: #86efac; }
+
+  /* ── Pill ── */
+  .pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .pill-ok     { background: #dcfce7; color: #166534; }
+  .pill-warn   { background: #fef9c3; color: #854d0e; }
+  .pill-danger { background: #fee2e2; color: #991b1b; }
+  .pill-info   { background: #e0f2fe; color: #075985; }
+  .pill-orange { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+
+  /* ── Note / Warning ── */
+  .note {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-left: 4px solid #3b82f6;
+    border-radius: 0 10px 10px 0;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 14px;
+    color: #1e40af;
+  }
+  .note strong { display: block; margin-bottom: 4px; font-size: 13px; }
+  .warning {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-left: 4px solid #f59e0b;
+    border-radius: 0 10px 10px 0;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 14px;
+    color: #92400e;
+  }
+  .warning strong { display: block; margin-bottom: 4px; font-size: 13px; }
+
+  /* ── Button repr ── */
+  .btn-repr {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #ff7616;
+    color: #fff;
+    border-radius: 8px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    vertical-align: middle;
+  }
+  .btn-repr.sec {
+    background: transparent;
+    border: 1px solid #cbd5e1;
+    color: #475569;
+  }
+  .btn-repr.ghost {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 2px 6px;
+  }
+
+  /* ── Sensor tags ── */
+  .sensor-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  .sensor-tag {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 12px;
+    color: #334155;
+    font-weight: 600;
+  }
+  .sensor-tag .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+
+  /* ── Flow diagram ── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding: 20px 0;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .flow-node {
+    background: #fff;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px 16px;
+    text-align: center;
+    min-width: 110px;
+    flex-shrink: 0;
+  }
+  .flow-node .fn-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+  .flow-node .fn-label { font-size: 12px; font-weight: 700; color: #0f172a; }
+  .flow-node .fn-sub { font-size: 11px; color: #94a3b8; }
+  .flow-node.highlight {
+    border-color: #ff7616;
+    background: #fff7ed;
+  }
+  .flow-arrow {
+    font-size: 18px;
+    color: #94a3b8;
+    flex-shrink: 0;
+    padding: 0 4px;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    background: #0f172a;
+    color: #475569;
+    text-align: center;
+    padding: 28px;
+    font-size: 12px;
+    margin-top: 60px;
+  }
+  .footer strong { color: #94a3b8; }
+
+  /* ── Print ── */
+  @media print {
+    .cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    thead tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
+  @media (max-width: 640px) {
+    .cover { padding: 40px 24px; }
+    .container { padding: 32px 16px 60px; }
+    .info-grid, .info-grid.col3 { grid-template-columns: 1fr; }
+    .toc ol { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ Cover ══════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-kicker">xCloud VLM Console — 操作手冊</div>
+  <div class="cover-badge">IoT Sensor Hub</div>
+  <h1>MQTT 感測器監控</h1>
+  <p class="cover-sub">即時接收並監控 MQTT 感測器回傳的設備數據，支援溫度、振動、壓力等多種類型感測器，每 5 秒自動刷新。</p>
+  <div class="cover-meta">
+    <span><strong>模組</strong>：MQTT 監控（IOT）</span>
+    <span><strong>路徑</strong>：/main/mqtt</span>
+    <span><strong>適用人員</strong>：現場監控人員、設備維護工程師</span>
+    <span><strong>版本</strong>：v1.0</span>
+  </div>
+</div>
+
+<!-- ══ Body ════════════════════════════════════════════════════════════════ -->
+<div class="container">
+
+  <!-- TOC -->
+  <div class="toc">
+    <h2>目錄</h2>
+    <ol>
+      <li><a href="#s1">模組概覽</a></li>
+      <li><a href="#s2">頁面介面說明</a></li>
+      <li><a href="#s3">Broker 狀態列</a></li>
+      <li><a href="#s4">統計資訊卡片</a></li>
+      <li><a href="#s5">設備即時讀值</a></li>
+      <li><a href="#s6">新增設備</a></li>
+      <li><a href="#s7">刪除設備</a></li>
+      <li><a href="#s8">測試發佈訊息</a></li>
+      <li><a href="#s9">自動刷新控制</a></li>
+      <li><a href="#s10">支援感測器類型</a></li>
+      <li><a href="#s11">MQTT Topic 規範</a></li>
+      <li><a href="#s12">常見問題排查</a></li>
+    </ol>
+  </div>
+
+  <!-- ── 01 模組概覽 ─────────────────────────────────────── -->
+  <div class="section" id="s1">
+    <div class="section-header">
+      <div class="section-num">01</div>
+      <h2>模組概覽</h2>
+      <span class="badge">Overview</span>
+    </div>
+    <p>MQTT 感測器監控頁面（<strong>/main/mqtt</strong>）是 xCloud VLM Console 的即時 IoT 監控中心，負責顯示所有已登錄 MQTT 感測設備的即時數值，並提供 Broker 連線狀態確認與測試發佈功能。</p>
+
+    <div class="info-grid col3">
+      <div class="info-box">
+        <div class="label">刷新頻率</div>
+        <div class="value">每 5 秒</div>
+        <div class="desc">自動模式下自動更新</div>
+      </div>
+      <div class="info-box">
+        <div class="label">Broker 位址</div>
+        <div class="value">mqtt-broker</div>
+        <div class="desc">連接埠 1883（MQTT）</div>
+      </div>
+      <div class="info-box">
+        <div class="label">訂閱主題</div>
+        <div class="value">xcloud/#</div>
+        <div class="desc">接收所有 xcloud/ 下的訊息</div>
+      </div>
+    </div>
+
+    <h3>資料流程</h3>
+    <div class="flow">
+      <div class="flow-node">
+        <span class="fn-icon">📡</span>
+        <div class="fn-label">MQTT 感測器</div>
+        <div class="fn-sub">現場設備</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <span class="fn-icon">🔀</span>
+        <div class="fn-label">Mosquitto Broker</div>
+        <div class="fn-sub">mqtt-broker:1883</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node highlight">
+        <span class="fn-icon">⚙️</span>
+        <div class="fn-label">Backend 服務</div>
+        <div class="fn-sub">訂閱 xcloud/#</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <span class="fn-icon">🗄️</span>
+        <div class="fn-label">資料庫</div>
+        <div class="fn-sub">SQLite 儲存</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node highlight">
+        <span class="fn-icon">📊</span>
+        <div class="fn-label">監控頁面</div>
+        <div class="fn-sub">即時展示</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 02 頁面介面說明 ─────────────────────────────────── -->
+  <div class="section" id="s2">
+    <div class="section-header">
+      <div class="section-num">02</div>
+      <h2>頁面介面說明</h2>
+      <span class="badge">UI Layout</span>
+    </div>
+    <p>頁面由上至下分為三個主要區塊：</p>
+
+    <div class="card">
+      <div class="card-title">① Broker 狀態列（最上方）</div>
+      <p class="card-desc">顯示 MQTT Broker 連線狀態、統計數字，以及操作按鈕列（自動刷新、刷新、測試發佈、新增設備）。</p>
+    </div>
+    <div class="card">
+      <div class="card-title">② 測試發佈面板（可展開）</div>
+      <p class="card-desc">點選「測試發佈」按鈕後展開，可手動輸入 Topic 與 Payload 向 Broker 發送測試訊息。預設隱藏。</p>
+    </div>
+    <div class="card">
+      <div class="card-title">③ 設備即時讀值（主要內容區）</div>
+      <p class="card-desc">以卡片排列顯示每台登錄設備的目前感測數值，每張卡片包含設備名稱、在線狀態與各類感測器最新讀值。</p>
+    </div>
+  </div>
+
+  <!-- ── 03 Broker 狀態列 ────────────────────────────────── -->
+  <div class="section" id="s3">
+    <div class="section-header">
+      <div class="section-num">03</div>
+      <h2>Broker 狀態列</h2>
+      <span class="badge">Status Bar</span>
+    </div>
+    <p>位於頁面最上方的深色面板，提供 MQTT Broker 即時連線資訊。</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>元素</th>
+          <th>說明</th>
+          <th>狀態顏色</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>連線圖示</td>
+          <td>左上角 WiFi 圖示，反映 Broker 目前狀態</td>
+          <td><span class="pill pill-ok">綠色 = 連線中</span> <span class="pill pill-danger">紅色 = 離線</span></td>
+        </tr>
+        <tr>
+          <td>Broker 狀態標籤</td>
+          <td>顯示「Broker 連線中」或「Broker 離線」</td>
+          <td><span class="pill pill-ok">OK</span> / <span class="pill pill-danger">Danger</span></td>
+        </tr>
+        <tr>
+          <td>Broker 位址</td>
+          <td>顯示 mqtt-broker:1883（主機名稱與連接埠）</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td>累計訊息數</td>
+          <td>Backend 服務啟動以來接收到的 MQTT 訊息總數</td>
+          <td>—</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <strong>說明</strong>
+      Broker 狀態列在寬螢幕（xl 以上）才會顯示詳細資訊標籤，小螢幕僅顯示標題與按鈕列。
+    </div>
+  </div>
+
+  <!-- ── 04 統計資訊卡片 ─────────────────────────────────── -->
+  <div class="section" id="s4">
+    <div class="section-header">
+      <div class="section-num">04</div>
+      <h2>統計資訊卡片</h2>
+      <span class="badge">Stats</span>
+    </div>
+    <p>Broker 狀態列下方排列四個統計卡片，提供系統整體概況。</p>
+
+    <div class="info-grid">
+      <div class="info-box">
+        <div class="label">訂閱 Topics</div>
+        <div class="value">xcloud/#</div>
+        <div class="desc">後端訂閱的主題過濾器，# 代表接收所有子主題</div>
+      </div>
+      <div class="info-box">
+        <div class="label">累計訊息數</div>
+        <div class="value">服務啟動以來</div>
+        <div class="desc">後端 mqtt_service 接收到的訊息總量，重啟後歸零</div>
+      </div>
+      <div class="info-box">
+        <div class="label">服務運行時間</div>
+        <div class="value">mm 分 / ss 秒</div>
+        <div class="desc">Backend 服務自啟動至今的運行時長</div>
+      </div>
+      <div class="info-box">
+        <div class="label">已登錄設備</div>
+        <div class="value">N 台 / N 台在線</div>
+        <div class="desc">已在系統中登錄的設備總數，括號內為目前在線數量</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 05 設備即時讀值 ─────────────────────────────────── -->
+  <div class="section" id="s5">
+    <div class="section-header">
+      <div class="section-num">05</div>
+      <h2>設備即時讀值</h2>
+      <span class="badge">Device Cards</span>
+    </div>
+    <p>主要內容區，以網格形式展示每台已登錄設備的感測卡片。桌面版為 2～3 欄排列，每 5 秒自動刷新一次。</p>
+
+    <h3>設備卡片說明</h3>
+    <p>每張設備卡片包含以下資訊：</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>區域</th>
+          <th>內容</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>卡片頂列</td>
+          <td>設備名稱、設備 ID、安裝位置、在線狀態標籤（Online / Offline）、展開/收合鈕、刪除鈕</td>
+        </tr>
+        <tr>
+          <td>感測器讀值格</td>
+          <td>依感測器類型顯示圖示、中文標籤、最新數值（含單位）、資料品質標籤（good / warn / error）、更新時間（x 秒前）</td>
+        </tr>
+        <tr>
+          <td>最後回傳時間</td>
+          <td>卡片底部顯示最後一次收到資料的相對時間</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>在線狀態說明</h3>
+    <div class="info-grid">
+      <div class="info-box">
+        <div class="label">Online（在線）</div>
+        <div class="value" style="color:#16a34a;">綠色邊框</div>
+        <div class="desc">設備最近有回傳資料，MQTT 訊息已成功接收</div>
+      </div>
+      <div class="info-box">
+        <div class="label">Offline（離線）</div>
+        <div class="value" style="color:#d97706;">灰色邊框</div>
+        <div class="desc">設備尚未回傳資料，或已超過一段時間未收到訊息</div>
+      </div>
+    </div>
+
+    <h3>資料品質標籤</h3>
+    <table>
+      <thead>
+        <tr><th>標籤</th><th>顏色</th><th>說明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>good</td><td><span class="pill pill-ok">綠色</span></td><td>資料正常，感測器工作良好</td></tr>
+        <tr><td>warn</td><td><span class="pill pill-warn">黃色</span></td><td>資料可能有異常或感測器有警告</td></tr>
+        <tr><td>error</td><td><span class="pill pill-danger">紅色</span></td><td>資料異常，感測器回報錯誤狀態</td></tr>
+      </tbody>
+    </table>
+
+    <h3>展開 / 收合卡片</h3>
+    <p>點選卡片右上角的 <span class="btn-repr ghost">∧ / ∨</span> 按鈕，可展開或收合感測器讀值區域。預設為展開狀態。收合後僅顯示設備標題列，方便同時監看大量設備。</p>
+
+    <div class="note">
+      <strong>提示</strong>
+      若設備已登錄但感測卡片顯示「尚未收到任何感測資料」，代表 MQTT 訊息尚未到達。請確認感測器 Topic 格式正確，並參考第 11 節 Topic 規範。
+    </div>
+  </div>
+
+  <!-- ── 06 新增設備 ─────────────────────────────────────── -->
+  <div class="section" id="s6">
+    <div class="section-header">
+      <div class="section-num">06</div>
+      <h2>新增設備</h2>
+      <span class="badge">Add Device</span>
+    </div>
+    <p>在監控頁面快速登錄新設備，登錄後設備卡片立即出現在頁面上，等待感測器開始回傳資料。</p>
+
+    <h3>操作步驟</h3>
+    <ol class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <strong>點選「＋ 新增設備」按鈕</strong>
+          <p>位於頁面右上角，點選後彈出新增設備對話框。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <strong>填寫設備 ID（必填）</strong>
+          <p>MQTT Topic 中的唯一識別碼。建議使用英文小寫加底線，例如：<code>compressor_01</code>。登錄後不可修改。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <strong>填寫顯示名稱（必填）</strong>
+          <p>頁面上顯示的設備中文名稱，例如：<code>壓縮機 #1</code>。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <strong>選擇設備類型與安裝位置（選填）</strong>
+          <p>設備類型：sensor / compressor / motor / pump / conveyor / cooler / panel / plc。安裝位置例如：廠房 A / 區域 1。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <strong>填寫 Topic 前綴（必填）</strong>
+          <p>MQTT 訂閱主題的前綴，格式為 <code>xcloud/{device_id}</code>，例如：<code>xcloud/compressor_01</code>。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <strong>點選「確認新增」</strong>
+          <p>儲存成功後對話框自動關閉，設備卡片出現在頁面上。</p>
+        </div>
+      </li>
+    </ol>
+
+    <table>
+      <thead>
+        <tr><th>欄位</th><th>必填</th><th>說明</th><th>範例</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>設備 ID</td><td><span class="pill pill-danger">必填</span></td><td>MQTT Topic 識別碼，全系統唯一</td><td>compressor_01</td></tr>
+        <tr><td>顯示名稱</td><td><span class="pill pill-danger">必填</span></td><td>頁面顯示用名稱</td><td>壓縮機 #1</td></tr>
+        <tr><td>設備類型</td><td><span class="pill pill-info">選填</span></td><td>設備分類，預設 sensor</td><td>compressor</td></tr>
+        <tr><td>安裝位置</td><td><span class="pill pill-info">選填</span></td><td>設備實體安裝位置</td><td>廠房 A 區域 1</td></tr>
+        <tr><td>Topic 前綴</td><td><span class="pill pill-danger">必填</span></td><td>MQTT 主題前綴</td><td>xcloud/compressor_01</td></tr>
+        <tr><td>備註</td><td><span class="pill pill-info">選填</span></td><td>其他說明文字</td><td>主線壓縮機</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warning">
+      <strong>注意</strong>
+      設備 ID 一旦建立後無法直接修改。若需變更，請先刪除該設備再重新新增。如要修改顯示名稱、位置等其他資訊，請至「感測器管理」頁面操作。
+    </div>
+  </div>
+
+  <!-- ── 07 刪除設備 ─────────────────────────────────────── -->
+  <div class="section" id="s7">
+    <div class="section-header">
+      <div class="section-num">07</div>
+      <h2>刪除設備</h2>
+      <span class="badge">Delete</span>
+    </div>
+    <p>在設備卡片上可直接刪除設備。</p>
+
+    <ol class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <strong>點選卡片右上角的 <span class="btn-repr ghost">🗑</span> 刪除圖示</strong>
+          <p>將滑鼠移至設備卡片標題列右側，找到垃圾桶圖示。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <strong>確認刪除對話框</strong>
+          <p>瀏覽器會彈出確認對話框，顯示「確定要刪除設備『XXX』？相關所有讀值也將一併刪除。」</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <strong>點選「確定」</strong>
+          <p>設備及其所有歷史感測資料將從資料庫中永久移除。</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="warning">
+      <strong>警告：此操作無法復原</strong>
+      刪除設備時，該設備所有歷史感測讀值、警報閾值設定將一併從資料庫中移除，且無法恢復。請謹慎操作。
+    </div>
+  </div>
+
+  <!-- ── 08 測試發佈訊息 ─────────────────────────────────── -->
+  <div class="section" id="s8">
+    <div class="section-header">
+      <div class="section-num">08</div>
+      <h2>測試發佈訊息</h2>
+      <span class="badge">Test Publish</span>
+    </div>
+    <p>工程師可使用測試發佈功能，手動向 MQTT Broker 發送一則訊息，驗證整條資料管道是否正常運作（感測器 → Broker → Backend → 資料庫 → 頁面）。</p>
+
+    <h3>操作步驟</h3>
+    <ol class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <strong>點選「測試發佈」按鈕</strong>
+          <p>按鈕位於頁面右上角操作列，點選後面板展開（橘色高亮表示已展開）。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <strong>填寫 Topic</strong>
+          <p>格式：<code>xcloud/{device_id}/{sensor_type}</code>，例如：<code>xcloud/compressor_01/temperature</code></p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <strong>填寫 Payload</strong>
+          <p>支援兩種格式：<br/>
+          JSON 格式：<code>{"value": 72.5, "unit": "°C", "quality": "good"}</code><br/>
+          純數字：<code>72.5</code></p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <strong>點選「發佈」按鈕</strong>
+          <p>訊息發送後約 1.5 秒，頁面自動刷新，若設備已登錄則可在卡片上看到剛發佈的數值。</p>
+        </div>
+      </li>
+    </ol>
+
+    <h3>Payload 格式說明</h3>
+    <div class="code-block">
+<span class="comment">// 完整 JSON 格式（推薦）</span>
+{
+  <span class="key">"value"</span>:   <span class="val">72.5</span>,          <span class="comment">// 感測數值（必填）</span>
+  <span class="key">"unit"</span>:    <span class="str">"°C"</span>,          <span class="comment">// 單位（選填）</span>
+  <span class="key">"quality"</span>: <span class="str">"good"</span>         <span class="comment">// 品質：good / warn / error（選填，預設 good）</span>
+}
+
+<span class="comment">// 簡易純數字格式</span>
+<span class="val">72.5</span>
+    </div>
+  </div>
+
+  <!-- ── 09 自動刷新控制 ─────────────────────────────────── -->
+  <div class="section" id="s9">
+    <div class="section-header">
+      <div class="section-num">09</div>
+      <h2>自動刷新控制</h2>
+      <span class="badge">Auto Refresh</span>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>模式</th><th>外觀</th><th>行為</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>自動刷新中</td>
+          <td>按鈕橘色高亮，圖示旋轉</td>
+          <td>每 5 秒自動向後端 API 取得最新資料，頁面持續更新</td>
+        </tr>
+        <tr>
+          <td>手動模式</td>
+          <td>按鈕一般灰色</td>
+          <td>停止自動刷新，需手動點選「刷新」按鈕才會更新</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>點選「自動刷新中 / 手動模式」按鈕可切換兩種模式。頁面預設為<strong>自動刷新模式</strong>。</p>
+
+    <div class="note">
+      <strong>建議</strong>
+      監控室長期顯示時建議保持自動刷新模式。若需截圖存檔或詳細檢視某一筆資料時，可切換至手動模式暫停更新。
+    </div>
+  </div>
+
+  <!-- ── 10 支援感測器類型 ───────────────────────────────── -->
+  <div class="section" id="s10">
+    <div class="section-header">
+      <div class="section-num">10</div>
+      <h2>支援感測器類型</h2>
+      <span class="badge">Sensor Types</span>
+    </div>
+    <p>系統支援以下感測器類型，不同類型在卡片上有對應的圖示與顏色區別：</p>
+
+    <table>
+      <thead>
+        <tr><th>類型（英文）</th><th>中文名稱</th><th>圖示顏色</th><th>常用單位</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>temperature</td><td>溫度</td><td>🟠 橘色</td><td>°C、°F</td></tr>
+        <tr><td>vibration</td><td>振動</td><td>🟣 紫色</td><td>mm/s、g</td></tr>
+        <tr><td>pressure</td><td>壓力</td><td>🔵 藍色</td><td>bar、kPa、psi</td></tr>
+        <tr><td>rpm</td><td>轉速</td><td>🩵 青色</td><td>rpm</td></tr>
+        <tr><td>humidity</td><td>濕度</td><td>🩵 綠青色</td><td>%RH</td></tr>
+        <tr><td>voltage</td><td>電壓</td><td>🟡 黃色</td><td>V、kV</td></tr>
+        <tr><td>current</td><td>電流</td><td>🟡 琥珀色</td><td>A、mA</td></tr>
+        <tr><td>power</td><td>功率</td><td>🔴 紅色</td><td>W、kW</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <strong>其他感測器類型</strong>
+      若感測器類型不在上表中（例如 <code>flow</code>、<code>level</code> 等），系統仍可接收並儲存資料，卡片上會以預設灰色圖示顯示，類型名稱直接作為標籤使用。
+    </div>
+  </div>
+
+  <!-- ── 11 MQTT Topic 規範 ──────────────────────────────── -->
+  <div class="section" id="s11">
+    <div class="section-header">
+      <div class="section-num">11</div>
+      <h2>MQTT Topic 規範</h2>
+      <span class="badge">Topic Spec</span>
+    </div>
+
+    <h3>Topic 格式</h3>
+    <div class="code-block">xcloud/<span class="key">{device_id}</span>/<span class="val">{sensor_type}</span>
+
+<span class="comment">// 範例</span>
+xcloud/compressor_01/temperature
+xcloud/motor_a/vibration
+xcloud/pump_02/pressure
+xcloud/cooling_fan/rpm
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>段落</th><th>說明</th><th>規則</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>xcloud</td><td>固定前綴，所有設備皆使用</td><td>固定，不可變更</td></tr>
+        <tr><td>{device_id}</td><td>設備識別碼，對應登錄時填寫的「設備 ID」</td><td>英文小寫、數字、底線，例：compressor_01</td></tr>
+        <tr><td>{sensor_type}</td><td>感測器類型，決定圖示與顯示名稱</td><td>英文小寫，例：temperature、vibration</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warning">
+      <strong>注意</strong>
+      <code>{device_id}</code> 必須完全符合系統中已登錄的設備 ID，否則 Backend 收到訊息後無法對應到設備，資料將不會被儲存。
+    </div>
+  </div>
+
+  <!-- ── 12 常見問題排查 ─────────────────────────────────── -->
+  <div class="section" id="s12">
+    <div class="section-header">
+      <div class="section-num">12</div>
+      <h2>常見問題排查</h2>
+      <span class="badge">Troubleshoot</span>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>問題現象</th><th>可能原因</th><th>解決方式</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Broker 顯示「離線」</td>
+          <td>mqtt-broker 容器未啟動，或後端服務無法連線</td>
+          <td>確認 <code>docker ps</code> 中 mqtt-broker 容器狀態為 Up；重啟 xcloud-qa-backend 容器</td>
+        </tr>
+        <tr>
+          <td>設備卡片出現但無讀值</td>
+          <td>感測器 Topic 格式不正確，或設備 ID 對應錯誤</td>
+          <td>確認 Topic 格式為 <code>xcloud/{device_id}/{sensor_type}</code>，且 device_id 與登錄的完全一致</td>
+        </tr>
+        <tr>
+          <td>設備顯示 Offline</td>
+          <td>感測器未回傳資料，或網路中斷</td>
+          <td>確認感測器設備電源與網路正常；使用「測試發佈」功能手動發送測試訊息確認管道</td>
+        </tr>
+        <tr>
+          <td>累計訊息數不增加</td>
+          <td>感測器訂閱主題不在 xcloud/# 範圍內</td>
+          <td>確認感測器發布的 Topic 以 <code>xcloud/</code> 開頭</td>
+        </tr>
+        <tr>
+          <td>頁面資料停止更新</td>
+          <td>自動刷新已被關閉，或網路連線中斷</td>
+          <td>確認「自動刷新中」按鈕為橘色高亮；手動點選「刷新」確認 API 是否正常回應</td>
+        </tr>
+        <tr>
+          <td>新增設備後找不到卡片</td>
+          <td>頁面尚未刷新</td>
+          <td>新增成功後頁面會自動刷新，若未出現請手動點選「刷新」按鈕</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- ══ Footer ══════════════════════════════════════════════════════════════ -->
+<div class="footer">
+  <strong>xCloud VLM Console</strong> — MQTT 感測器監控操作手冊 v1.0<br />
+  模組：MQTT 監控（IOT）　路徑：/main/mqtt　適用版本：xcloudvlmui v1.0+
+</div>
+
+</body>
+</html>

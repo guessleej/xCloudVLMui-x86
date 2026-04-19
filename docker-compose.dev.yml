@@ -1,0 +1,88 @@
+# docker-compose.dev.yml — macOS 本機開發 override
+# 用法: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# ⚠️  僅供本機開發測試，不適用於 Jetson 生產環境。
+#
+# Port 對應（避開本機已佔用的 port）：
+#   nginx    → 8880:80   (原 80, 已被 xcloudlisbot-nginx-1 佔用)
+#   backend  → 8001:8000 (原 8000, 已被 docker-api-1 佔用)
+#   frontend → 3100:3000 (原 3000, 已被 docker-web-1 佔用)
+#   mosquitto→ 1884:1883 (原 1883, 已被 mqtt-broker 佔用)
+#   cadvisor → 8091:8080 (無衝突)
+
+services:
+
+  # --- Mosquitto: 改用不衝突的 port --------------------------------
+  mosquitto:
+    ports:
+      - "1884:1883"
+      - "9002:9001"
+
+  # --- Jetson stub: llama-cpp --------------------------------------
+  llama-cpp:
+    image: traefik/whoami:latest
+    container_name: llama-cpp
+    restart: unless-stopped
+    runtime: ""
+    deploy: {}
+    ports:
+      - "18080:80"
+    devices: []
+    volumes: []
+    command: []
+    environment: {}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # --- Jetson stub: vlm-webui --------------------------------------
+  vlm-webui:
+    image: traefik/whoami:latest
+    container_name: vlm-webui
+    restart: unless-stopped
+    build: null
+    runtime: ""
+    deploy: {}
+    ports:
+      - "8090:80"
+    devices: []
+    command: []
+    environment: {}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # --- model-init: 跳過下載 ----------------------------------------
+  model-init:
+    image: busybox:latest
+    command: ["sh", "-c", "echo 'dev mode: skip model download' && exit 0"]
+
+  # --- backend: 改 port + 放寬 depends_on --------------------------
+  backend:
+    ports:
+      - "8001:8000"
+    depends_on:
+      llama-cpp:
+        condition: service_started
+      mosquitto:
+        condition: service_healthy
+
+  # --- frontend: 改 port -------------------------------------------
+  frontend:
+    ports:
+      - "3100:3000"
+
+  # --- nginx: 改 port + 放寬 depends_on ----------------------------
+  nginx:
+    ports:
+      - "8880:80"
+    depends_on:
+      frontend:
+        condition: service_started
+      backend:
+        condition: service_healthy

@@ -1,0 +1,108 @@
+# pyproject.toml — xCloudVLMui Platform Backend
+# 程式碼品質工具：Ruff（Linter）+ Black（Formatter）+ mypy（型別檢查）
+# 安裝：pip install -r requirements-dev.txt
+
+[tool.black]
+line-length    = 100
+target-version = ["py311"]
+skip-string-normalization = false
+
+[tool.ruff]
+line-length    = 100
+target-version = "py311"
+src            = [".", "routers", "models", "services", "adapters", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "N",    # pep8-naming
+    "ANN",  # flake8-annotations（型別提示）
+    "S",    # flake8-bandit（安全性）
+    "T20",  # flake8-print（禁止 print）
+    "PT",   # flake8-pytest-style
+    "RUF",  # Ruff 特有規則
+]
+ignore = [
+    "ANN101",  # Missing type annotation for `self`
+    "ANN102",  # Missing type annotation for `cls`
+    "ANN401",  # Dynamically typed expressions (Any) are disallowed
+    "S101",    # Use of `assert` detected（pytest 測試需要）
+    "S104",    # Possible binding to all interfaces（uvicorn 0.0.0.0）
+    "B008",    # Do not perform function calls in default args（FastAPI Depends）
+    "N999",    # Invalid module name（routers/_shared_data.py 底線前綴）
+    "E712",    # Comparison to `True`/`False`（SQLAlchemy ORM 過濾需要）
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py"      = ["ANN", "S", "T20"]   # 測試檔案放寬型別與安全規則
+"routers/dashboard.py" = ["ANN"]              # 向後相容墊片
+"routers/rag.py"       = ["ANN"]              # 向後相容墊片
+
+[tool.ruff.lint.isort]
+known-first-party = ["config", "database", "models", "services", "adapters", "routers"]
+
+[tool.mypy]
+python_version         = "3.11"
+strict                 = false
+ignore_missing_imports = true
+warn_return_any        = true
+warn_unused_ignores    = true
+disallow_untyped_defs  = true
+disallow_incomplete_defs = true
+check_untyped_defs     = true
+no_implicit_optional   = true
+show_error_codes       = true
+plugins                = ["sqlalchemy.ext.mypy.plugin"]
+
+[[tool.mypy.overrides]]
+module = [
+    "chromadb.*",
+    "pdfminer.*",
+    "pypdf.*",
+    "aiomqtt.*",
+    "sentence_transformers.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode    = "auto"
+testpaths       = ["tests"]
+python_files    = ["test_*.py"]
+python_classes  = ["Test*"]
+python_functions= ["test_*"]
+addopts         = "-v --tb=short --cov=. --cov-report=term-missing --cov-report=xml:coverage.xml --cov-fail-under=50"
+# NOTE: 覆蓋率目標路線圖
+#   v1.1.0 → 50%（過渡目標，TD-003 技術債務）
+#   v1.2.0 → 70%（正式目標，SLO-05）
+#   達到 70% 後將此值改回 70
+
+[tool.coverage.run]
+source   = ["."]
+omit     = [
+    "tests/*",
+    "**/__init__.py",
+    "routers/dashboard.py",   # deprecated shim
+    "routers/rag.py",         # deprecated shim
+    ".venv/*",
+    "*/site-packages/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "@(abc\\.)?abstractmethod",
+    "\\.\\.\\.\\s*$",          # Protocol stub bodies
+]
+show_missing  = true
+skip_covered  = false
+precision     = 1
