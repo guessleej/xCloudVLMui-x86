@@ -48,7 +48,7 @@ import { useYolo, type YoloDetection, calcManufacturingStats } from "@/hooks/use
 import { useYoloPose, type PoseDetection, drawPoseOverlay, poseToDbFormat } from "@/hooks/useYoloPose";
 import { useYoloSegment, type SegmentDetection } from "@/hooks/useYoloSegment";
 import { useYoloClassify, type ClassifyResult } from "@/hooks/useYoloClassify";
-import { useBehaviorDetector, type BehaviorAlert } from "@/hooks/useBehaviorDetector";
+import { useBehaviorDetector, type BehaviorAlert, type PersonInfo, ACTION_ZH, GENDER_ZH } from "@/hooks/useBehaviorDetector";
 import { SortTracker, type TrackedObject, drawTrackIds } from "@/lib/yoloTracker";
 import type { TrainedModel } from "@/types";
 
@@ -669,6 +669,119 @@ function drawYoloOverlay(
   }
 }
 
+/**
+ * 人員分析 Canvas 疊加層
+ * 在每位人員 bbox 上顯示：性別推測 + 當前動作
+ *
+ * 標籤格式：[性別圖示] 男/女/人員 · 站立/坐著/行走…
+ * 顏色：
+ *   男性   → 藍色  #60a5fa
+ *   女性   → 粉色  #f472b6
+ *   未知   → 青灰  #94a3b8
+ */
+function drawPersonInfoOverlay(
+  canvas: HTMLCanvasElement,
+  video:  HTMLVideoElement,
+  infos:  PersonInfo[],
+): void {
+  if (!infos.length) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const W = canvas.width  || video.getBoundingClientRect().width;
+  const H = canvas.height || video.getBoundingClientRect().height;
+
+  // 性別顏色設定
+  const GENDER_COLOR: Record<string, { border: string; bg: string; icon: string }> = {
+    male:    { border: "#3b82f6", bg: "rgba(59,130,246,0.82)",  icon: "♂" },
+    female:  { border: "#ec4899", bg: "rgba(236,72,153,0.82)",  icon: "♀" },
+    unknown: { border: "#475569", bg: "rgba(30,41,59,0.80)",    icon: "👤" },
+  };
+
+  // 動作顏色（特殊動作用警示色）
+  const ACTION_COLOR: Record<string, string> = {
+    running:      "#ef4444", // 紅色 — 可能緊急
+    raising_hand: "#f59e0b", // 琥珀 — 可能求助
+    bending:      "#f97316", // 橙色 — 工安注意
+    squatting:    "#a78bfa", // 紫色 — 注意
+    default:      "#e2e8f0", // 白灰 — 正常
+  };
+
+  for (const info of infos) {
+    const d  = info.det;
+    const bx = d.x * W;
+    const by = d.y * H;
+    const bw = d.w * W;
+    const bh = d.h * H;
+
+    const gCol   = GENDER_COLOR[info.gender] ?? GENDER_COLOR.unknown;
+    const aColor = ACTION_COLOR[info.action] ?? ACTION_COLOR.default;
+
+    // ── 人員 bbox 邊框（性別顏色）─────────────────────────────────────
+    ctx.save();
+    ctx.strokeStyle = gCol.border;
+    ctx.lineWidth   = 2;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw, bh, 6);
+    ctx.stroke();
+
+    // ── L 型角落標記 ──────────────────────────────────────────────────
+    const cl = Math.min(14, bw * 0.12, bh * 0.08);
+    ctx.lineWidth = 2.5;
+    const corners: [number, number, number, number][] = [
+      [bx,      by,      1,  1],
+      [bx + bw, by,     -1,  1],
+      [bx,      by + bh, 1, -1],
+      [bx + bw, by + bh,-1, -1],
+    ];
+    for (const [cx2, cy2, dx, dy] of corners) {
+      ctx.beginPath();
+      ctx.moveTo(cx2 + dx * cl, cy2);
+      ctx.lineTo(cx2, cy2);
+      ctx.lineTo(cx2, cy2 + dy * cl);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // ── 性別 + 動作標籤 ───────────────────────────────────────────────
+    ctx.save();
+    const genderLabel = GENDER_ZH[info.gender];
+    const actionLabel = ACTION_ZH[info.action];
+    const confLabel   = info.genderConf > 0.35 ? ` ${Math.round(info.genderConf * 100)}%` : "";
+    const labelText   = `${gCol.icon} ${genderLabel}${confLabel} · ${actionLabel}`;
+
+    const fs  = Math.max(10, Math.min(13, W * 0.018));
+    ctx.font  = `bold ${fs}px "SF Pro Text", system-ui, sans-serif`;
+    const tw  = ctx.measureText(labelText).width + 14;
+    const lh  = fs + 9;
+    const lx  = Math.min(bx, W - tw - 2);
+    const ly  = by > lh + 4 ? by - 3 : by + bh + 3; // 優先放框上方
+
+    // 背景
+    ctx.fillStyle = gCol.bg;
+    ctx.beginPath();
+    ctx.roundRect(lx, ly - lh + 3, tw, lh, 5);
+    ctx.fill();
+
+    // 邊框
+    ctx.strokeStyle = gCol.border;
+    ctx.lineWidth   = 1;
+    ctx.stroke();
+
+    // 性別文字（白色）
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(labelText.split(" · ")[0], lx + 6, ly);
+
+    // 動作文字（動作顏色）
+    const gPartW = ctx.measureText(labelText.split(" · ")[0] + " · ").width;
+    ctx.fillStyle = aColor;
+    ctx.fillText(actionLabel, lx + 6 + gPartW, ly);
+
+    ctx.restore();
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    環境資訊顯示輔助
 ════════════════════════════════════════════════════════════════════════════ */
@@ -975,6 +1088,7 @@ export default function CameraStream({
 
   /* ── 行為偵測狀態 ─────────────────────────────────────────────────── */
   const [behaviorAlerts,    setBehaviorAlerts]    = useState<BehaviorAlert[]>([]);
+  const [personInfos,       setPersonInfos]       = useState<PersonInfo[]>([]);
 
   /* ── 場景分類結果 ─────────────────────────────────────────────────── */
   const [sceneClasses,      setSceneClasses]      = useState<ClassifyResult[]>([]);
@@ -1530,9 +1644,10 @@ export default function CameraStream({
           const tracked = sortTrackerRef.current.update(dets);
           setYoloDetections(dets);
 
-          // 行為偵測（detect + pose + track 三路輸入）
+          // 行為偵測（detect + pose + track 三路輸入）→ 同時產生 personInfos
           const behaviors = behaviorDetector.detect(dets, poses, tracked);
           setBehaviorAlerts(behaviors);
+          setPersonInfos(behaviorDetector.personInfos);
 
           // 場景分類結果
           if (classes.length > 0) setSceneClasses(classes);
@@ -1554,6 +1669,8 @@ export default function CameraStream({
             drawPoseOverlay(canvas as HTMLCanvasElement, video, poses);
             // 3. Track ID 標籤（所有追蹤目標）
             drawTrackIds(ctx2d, tracked as TrackedObject[], canvas.width, canvas.height);
+            // 4. 人員分析標籤（性別推測 + 動作偵測）
+            drawPersonInfoOverlay(canvas, video, behaviorDetector.personInfos);
           }
 
           const now = performance.now();
