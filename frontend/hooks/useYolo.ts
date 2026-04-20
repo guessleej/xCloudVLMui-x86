@@ -147,7 +147,9 @@ export const COCO_CLASSES: CocoClassMeta[] = [
   { zh: "滑鼠",       en: "mouse",          risk: "safe",     category: "equipment", confThresh: 0.40 }, // 64
   { zh: "遙控器",     en: "remote",         risk: "safe",     category: "equipment", confThresh: 0.45 }, // 65
   { zh: "鍵盤",       en: "keyboard",       risk: "safe",     category: "equipment", confThresh: 0.40 }, // 66
-  { zh: "手機",       en: "cell phone",     risk: "warning",  category: "equipment", confThresh: 0.30 }, // 67  ← 工作中使用手機
+  // ⚠ confThresh 0.65：AirPods 盒 / 遙控器 / 其他小型方盒易誤判為手機
+  //   真實手機信心通常 > 0.65；低信心偵測幾乎全為誤判
+  { zh: "手機",       en: "cell phone",     risk: "warning",  category: "equipment", confThresh: 0.65 }, // 67  ← 工作中使用手機
   { zh: "微波爐",     en: "microwave",      risk: "safe",     category: "equipment", confThresh: 0.45 }, // 68
   { zh: "烤箱",       en: "oven",           risk: "warning",  category: "equipment", confThresh: 0.35 }, // 69  ← 高溫設備
   { zh: "烤麵包機",   en: "toaster",        risk: "safe",     category: "equipment", confThresh: 0.50 }, // 70

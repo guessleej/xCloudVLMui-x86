@@ -347,14 +347,44 @@ export function useBehaviorDetector() {
 
       // ─────────────────────────────────────────────────────────────────
       // 規則 6：phone_usage — 工作中使用手機
-      // 條件：偵測到人員且偵測到手機
+      //
+      // 三重過濾，避免 AirPods 盒 / 遙控器 / 小方盒誤判：
+      //   ① 形狀過濾：手機 bbox 的 h/w 比例需 > 1.3（直向）或 < 0.7（橫向）
+      //      → AirPods 盒 h/w ≈ 1.1~1.3，接近正方形，排除在外
+      //   ② 面積過濾：bbox 面積 > 0.005（正規化），排除遠景小物件
+      //   ③ 上半身接近：手機中心點需在人員 bbox 的上方 70% 範圍內
+      //      + 水平允許 ±30% 寬度容差
       // ─────────────────────────────────────────────────────────────────
       if (persons.length > 0 && phones.length > 0) {
-        alerts.push(makeAlert(
-          "phone_usage",
-          0.85,
-          `偵測到 ${phones.length} 支手機，疑似工作中使用手機`,
-        ));
+        const usagePhones = phones.filter((phone) => {
+          // ① 形狀過濾：直向手機 h/w > 1.3，橫向 h/w < 0.7；排除接近正方形的物件
+          const aspectRatio = phone.w > 0 ? phone.h / phone.w : 0;
+          const isPhoneShape = aspectRatio > 1.3 || aspectRatio < 0.7;
+          if (!isPhoneShape) return false;
+
+          // ② 面積過濾：至少佔畫面 0.5%
+          const area = phone.w * phone.h;
+          if (area < 0.005) return false;
+
+          // ③ 上半身接近：手機中心需落在人員上半身範圍（含水平容差）
+          const phoneCx = phone.x + phone.w / 2;
+          const phoneCy = phone.y + phone.h / 2;
+          return persons.some((p) => {
+            const margin = p.w * 0.3;
+            const inX = phoneCx >= p.x - margin && phoneCx <= p.x + p.w + margin;
+            const inY = phoneCy >= p.y && phoneCy <= p.y + p.h * 0.75;  // 上 3/4 = 上半身
+            return inX && inY;
+          });
+        });
+
+        if (usagePhones.length > 0) {
+          const maxConf = Math.max(...usagePhones.map((p) => p.confidence));
+          alerts.push(makeAlert(
+            "phone_usage",
+            Math.min(0.95, maxConf + 0.1),
+            `偵測到 ${usagePhones.length} 支手機在人員上半身附近，疑似工作中使用手機`,
+          ));
+        }
       }
 
       // ─────────────────────────────────────────────────────────────────
