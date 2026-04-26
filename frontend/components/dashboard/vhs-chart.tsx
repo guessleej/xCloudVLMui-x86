@@ -234,65 +234,45 @@ export default function VhsChart({
   }
 
   return (
-    <div className="panel-soft overflow-hidden rounded-[30px] p-5 sm:p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="section-kicker">Health Trend</div>
-          <h3 className="mt-3 text-xl font-semibold text-white">
-            {equipmentName || "尚未選擇設備"}
-          </h3>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            過去 14 天的視覺健康分數變化，用於觀察退化速度與維修節奏是否有效。
-          </p>
-
-          {/* 資料來源 badge */}
+    <div className="panel-soft overflow-hidden rounded-2xl p-3">
+      {/* Header — 單行緊湊 */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-white/8 pb-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="section-kicker">Health Trend</span>
+          <span className="text-sm font-semibold text-white">{equipmentName || "尚未選擇設備"}</span>
+          {/* 區間圖例 */}
+          {[
+            { color: "bg-emerald-400", label: "穩定 70–100" },
+            { color: "bg-amber-300",   label: "警戒 40–69"  },
+            { color: "bg-rose-400",    label: "危急 0–39"   },
+          ].map(({ color, label }) => (
+            <span key={label} className="flex items-center gap-1 text-[11px] text-slate-400">
+              <span className={`h-2 w-2 rounded-full ${color}`} />{label}
+            </span>
+          ))}
+          {/* 資料來源 */}
           {meta && (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 rounded-xl border border-white/8 bg-white/[0.04] px-3 py-1.5">
-                <Database className="h-3.5 w-3.5 text-accent-300" />
-                <span className="text-xs text-slate-300">
-                  {realDays > 0
-                    ? `${realDays} 天真實記錄 / ${estDays} 天估算`
-                    : "全部為估算資料"}
-                </span>
-              </div>
-              {/* 資料來源圖例 */}
-              {[
-                { src: "vlm",    label: "VLM 推論" },
-                { src: "manual", label: "人工輸入" },
-                { src: "seed",   label: "歷史種子" },
-              ].map(({ src, label }) => {
-                const hasSrc = data.some((d) => d.source === src);
-                if (!hasSrc) return null;
-                return (
-                  <div key={src} className="flex items-center gap-1.5 rounded-xl border border-white/8 bg-white/[0.03] px-2.5 py-1.5">
-                    <span
-                      className="inline-block h-2 w-2 rounded-full"
-                      style={{ background: SOURCE_DOT[src].fill }}
-                    />
-                    <span className="text-xs text-slate-400">{label}</span>
-                  </div>
-                );
-              })}
-            </div>
+            <span className="flex items-center gap-1 rounded-lg border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[11px] text-slate-400">
+              <Database className="h-3 w-3 text-accent-300" />
+              {realDays > 0 ? `${realDays}天實測 / ${estDays}天估算` : "估算資料"}
+            </span>
           )}
         </div>
 
-        <div className="flex flex-col items-end gap-3">
-          <div className="grid grid-cols-3 gap-2 text-center text-xs sm:min-w-[360px]">
-            <LegendItem color="bg-emerald-400" label="穩定區" value="70 - 100" />
-            <LegendItem color="bg-amber-300"   label="警戒區" value="40 - 69" />
-            <LegendItem color="bg-rose-400"    label="危急區" value="0 - 39" />
-          </div>
-
-          {/* 記錄 VHS 按鈕 */}
+        <div className="flex items-center gap-2">
+          {/* 來源點圖例 */}
+          {meta && [
+            { src: "vlm",    label: "VLM" },
+            { src: "manual", label: "人工" },
+            { src: "seed",   label: "種子" },
+          ].filter(({ src }) => data.some(d => d.source === src)).map(({ src, label }) => (
+            <span key={src} className="flex items-center gap-1 text-[11px] text-slate-400">
+              <span className="inline-block h-2 w-2 rounded-full" style={{ background: SOURCE_DOT[src].fill }} />{label}
+            </span>
+          ))}
           {equipmentId && !showForm && (
-            <button
-              onClick={() => setShowForm(true)}
-              className="secondary-button"
-            >
-              <Plus className="h-4 w-4" />
-              記錄 VHS 分數
+            <button onClick={() => setShowForm(true)} className="secondary-button py-1 text-xs">
+              <Plus className="h-3.5 w-3.5" />記錄 VHS
             </button>
           )}
         </div>
@@ -303,16 +283,13 @@ export default function VhsChart({
         <RecordForm
           equipmentId={equipmentId}
           equipmentName={equipmentName}
-          onSuccess={() => {
-            setShowForm(false);
-            onRecorded?.();
-          }}
+          onSuccess={() => { setShowForm(false); onRecorded?.(); }}
           onCancel={() => setShowForm(false)}
         />
       )}
 
       {/* 圖表 */}
-      <div className="mt-6 h-[300px]">
+      <div className="h-[180px]">
         {data.length === 0 ? (
           <div className="flex h-full items-center justify-center text-slate-500">
             <p className="text-sm">請先選擇設備</p>

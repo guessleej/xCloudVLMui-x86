@@ -372,17 +372,15 @@ export default function DashboardPage() {
       </div>
 
       {/*
-       * ┌─ 4. BOTTOM ROW — VHS Chart + Pipeline ──────────────────────────┐
+       * ┌─ 4. BOTTOM — VHS Chart (full width) + Pipeline (full width 4-col) ─┐
        */}
-      <div className="grid gap-3 lg:grid-cols-[1fr_280px] xl:grid-cols-[1fr_300px]">
-        <VhsChart
-          meta={vhsMeta}
-          equipmentId={selected?.id ?? ""}
-          equipmentName={selected?.name ?? ""}
-          onRecorded={() => selected && fetchVhs(selected.id)}
-        />
-        <PipelineFlow />
-      </div>
+      <VhsChart
+        meta={vhsMeta}
+        equipmentId={selected?.id ?? ""}
+        equipmentName={selected?.name ?? ""}
+        onRecorded={() => selected && fetchVhs(selected.id)}
+      />
+      <PipelineFlow />
     </>
   );
 }

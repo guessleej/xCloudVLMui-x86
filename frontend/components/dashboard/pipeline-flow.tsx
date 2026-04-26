@@ -60,67 +60,56 @@ const OVERALL_CONFIG: Record<string, { label: string; chip: string; icon: React.
   offline:  { label: "系統離線", chip: "status-pill status-pill-danger", icon: WifiOff },
 };
 
-// ── 單段卡片 ──────────────────────────────────────────────────────────
+// ── 單段卡片（水平緊湊版）────────────────────────────────────────────
 function StageCard({ stage, index }: { stage: PipelineStage; index: number }) {
-  const meta   = STAGE_META[stage.key] ?? STAGE_META.vision;
-  const Icon   = meta.icon;
-  const dotCfg = STATUS_DOT[stage.status] ?? STATUS_DOT.unknown;
+  const meta    = STAGE_META[stage.key] ?? STAGE_META.vision;
+  const Icon    = meta.icon;
+  const dotCfg  = STATUS_DOT[stage.status] ?? STATUS_DOT.unknown;
+  const isOnline = stage.status === "online";
 
-  const isOnline  = stage.status === "online";
-  const cardBorder = isOnline ? meta.onlineBorder : "border-white/8";
-  const cardBg     = isOnline ? meta.onlineBg : "bg-white/[0.025]";
+  // 每段只顯示前 3 個 metrics
+  const metrics = Object.entries(stage.metrics).slice(0, 3);
 
   return (
-    <div className={`relative overflow-hidden rounded-[24px] border ${cardBorder} ${cardBg} p-4 transition-all duration-500`}>
-      {/* Step number + status dot */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className={`flex h-11 w-11 items-center justify-center rounded-2xl border border-white/8 bg-slate-950/40 ${isOnline ? meta.onlineColor : "text-slate-500"}`}>
-            <Icon className="h-5 w-5" />
+    <div className={`flex flex-col gap-3 rounded-2xl border p-3 transition-all duration-300 ${
+      isOnline ? `${meta.onlineBorder} ${meta.onlineBg}` : "border-white/8 bg-white/[0.025]"
+    }`}>
+      {/* 頂列：步驟號 + 名稱 + 狀態燈 */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-slate-950/40 ${isOnline ? meta.onlineColor : "text-slate-500"}`}>
+            <Icon className="h-4 w-4" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="table-chip">0{index + 1}</span>
-              <p className="text-sm font-semibold text-white">{stage.label}</p>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="table-chip !px-1.5 !py-0 !text-[9px]">0{index + 1}</span>
+              <p className="text-[13px] font-semibold text-white">{stage.label}</p>
             </div>
-            <p className="mt-1 text-xs text-slate-500">{stage.subtitle}</p>
+            <p className="truncate text-[11px] text-slate-500">{stage.subtitle}</p>
           </div>
         </div>
-
-        {/* Status indicator */}
-        <div className="flex flex-col items-end gap-1">
-          <div className={`relative flex h-3 w-3 items-center justify-center`}>
-            <span className={`relative inline-flex h-3 w-3 rounded-full ${dotCfg.dot} ring-2 ${dotCfg.ring}`}>
-              {dotCfg.pulse && (
-                <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${dotCfg.dot} opacity-50`} />
-              )}
-            </span>
-          </div>
-          <span className={`text-[10px] font-medium ${
-            stage.status === "online"  ? "text-emerald-400" :
-            stage.status === "warning" ? "text-amber-400"   :
-            stage.status === "offline" ? "text-rose-400"    : "text-slate-500"
-          }`}>
-            {stage.status_label}
+        <div className="flex shrink-0 flex-col items-end gap-0.5">
+          <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${dotCfg.dot} ring-2 ${dotCfg.ring}`}>
+            {dotCfg.pulse && <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${dotCfg.dot} opacity-50`} />}
           </span>
+          <span className={`text-[10px] font-medium ${
+            isOnline ? "text-emerald-400" : stage.status === "warning" ? "text-amber-400" : stage.status === "offline" ? "text-rose-400" : "text-slate-500"
+          }`}>{stage.status_label}</span>
         </div>
       </div>
 
-      {/* Metrics grid */}
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        {Object.entries(stage.metrics).map(([k, v]) => (
-          <div key={k} className="rounded-[16px] border border-white/6 bg-slate-950/30 px-3 py-2.5">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-600">{k}</p>
-            <p className={`mt-1 text-xs font-medium leading-4 ${isOnline ? "text-slate-200" : "text-slate-500"}`}>
-              {v}
-            </p>
+      {/* Metrics — 單欄堆疊 */}
+      <div className="flex flex-col gap-1">
+        {metrics.map(([k, v]) => (
+          <div key={k} className="flex items-baseline justify-between gap-2 rounded-xl border border-white/6 bg-slate-950/30 px-2.5 py-1.5">
+            <p className="shrink-0 text-[10px] uppercase tracking-[0.15em] text-slate-600">{k}</p>
+            <p className={`truncate text-right text-[11px] font-medium ${isOnline ? "text-slate-200" : "text-slate-500"}`}>{v}</p>
           </div>
         ))}
       </div>
 
-      {/* Last checked */}
-      <p className="mt-3 text-right text-[10px] text-slate-600">
-        更新於 {new Date(stage.checked_at).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+      <p className="text-right text-[10px] text-slate-700">
+        {new Date(stage.checked_at).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
       </p>
     </div>
   );
@@ -158,83 +147,64 @@ export default function PipelineFlow() {
   const OverallIcon = overallCfg.icon;
 
   return (
-    <div className="panel-soft rounded-[30px] p-5 sm:p-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="section-kicker">System Flow</div>
-          <h2 className="mt-3 text-2xl font-semibold text-white">資料流與輸出節奏</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            依照巡檢架構圖，將整體任務拆成四段式即時管線，每 30 秒自動刷新。
-          </p>
+    <div className="panel-soft rounded-2xl p-3">
+      {/* Header — 一行緊湊 */}
+      <div className="mb-3 flex items-center justify-between gap-3 border-b border-white/8 pb-3">
+        <div className="flex items-center gap-2">
+          <span className="section-kicker">System Flow</span>
+          <span className="text-[11px] text-slate-500">四段式即時管線 · 30s 自動刷新</span>
+          {error && !status && (
+            <div className="flex items-center gap-1.5 rounded-xl border border-amber-400/20 bg-amber-400/8 px-2.5 py-1">
+              <AlertTriangle className="h-3 w-3 text-amber-300" />
+              <span className="text-[11px] text-amber-300">後端連接中</span>
+            </div>
+          )}
         </div>
-
-        <div className="flex shrink-0 flex-col items-end gap-2">
+        <div className="flex items-center gap-2">
           {status && (
-            <span className={overallCfg.chip}>
+            <span className={`${overallCfg.chip} !py-0.5 !text-[10px]`}>
               <OverallIcon className="h-3 w-3" />
               {overallCfg.label}
             </span>
           )}
-          <button
-            onClick={fetch}
-            disabled={loading}
-            className="secondary-button"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          <button onClick={fetch} disabled={loading} className="secondary-button py-1 text-xs">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             {loading ? "檢測中" : "刷新"}
           </button>
         </div>
       </div>
 
-      {/* Error state */}
-      {error && !status && (
-        <div className="mt-6 rounded-[22px] border border-amber-400/20 bg-amber-400/8 px-5 py-4">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="h-5 w-5 shrink-0 text-amber-300" />
-            <p className="text-sm text-amber-200">{error}</p>
-          </div>
-          <p className="mt-2 text-xs text-slate-400">
-            顯示靜態管線架構，連線後將自動切換為即時狀態。
-          </p>
-        </div>
-      )}
-
-      {/* Pipeline stages */}
-      <div className="mt-6 space-y-4">
+      {/* Pipeline stages — 水平 4 欄 */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {status ? (
           status.stages.map((stage, i) => (
             <StageCard key={stage.key} stage={stage} index={i} />
           ))
         ) : (
-          /* Skeleton fallback（後端未就緒時顯示靜態架構）*/
           FALLBACK_STAGES.map((s, i) => (
-            <div key={s.key} className="relative overflow-hidden rounded-[24px] border border-white/8 bg-white/[0.035] p-4">
-              <div className="flex items-start gap-4">
-                <div className="flex h-11 w-11 animate-pulse items-center justify-center rounded-2xl border border-white/8 bg-slate-800/60">
-                  <s.icon className="h-5 w-5 text-slate-600" />
+            <div key={s.key} className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.025] p-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 animate-pulse items-center justify-center rounded-xl border border-white/8 bg-slate-800/60">
+                  <s.icon className="h-4 w-4 text-slate-600" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="table-chip">0{i + 1}</span>
-                    <p className="text-sm font-semibold text-white">{s.label}</p>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="table-chip !px-1.5 !py-0 !text-[9px]">0{i + 1}</span>
+                    <p className="text-[13px] font-semibold text-white">{s.label}</p>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">{s.detail}</p>
-                  <div className="mt-3 h-2 w-3/4 animate-pulse rounded-full bg-slate-800" />
+                  <p className="text-[11px] text-slate-500">{s.detail}</p>
                 </div>
               </div>
+              <div className="h-2 w-3/4 animate-pulse rounded-full bg-slate-800" />
+              <div className="h-2 w-1/2 animate-pulse rounded-full bg-slate-800/60" />
             </div>
           ))
         )}
       </div>
 
-      {/* Last checked timestamp */}
       {status && (
-        <p className="mt-4 text-right text-[11px] text-slate-600">
-          最後檢測：{new Date(status.checked_at).toLocaleString("zh-TW", {
-            month: "2-digit", day: "2-digit",
-            hour: "2-digit",  minute: "2-digit", second: "2-digit",
-          })}
+        <p className="mt-2 text-right text-[10px] text-slate-700">
+          {new Date(status.checked_at).toLocaleString("zh-TW", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
         </p>
       )}
     </div>
