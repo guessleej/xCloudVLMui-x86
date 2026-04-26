@@ -3,7 +3,6 @@
 import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import {
-  Bell,
   Clock3,
   LogOut,
   PanelLeftClose,
@@ -51,75 +50,61 @@ export default function TopNav({
     : "XC";
 
   return (
-    <header className="relative z-10 border-b border-white/8 bg-surface/50 px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onToggleSidebar}
-              className="secondary-button hidden h-11 w-11 rounded-2xl px-0 lg:inline-flex"
-              title={sidebarCollapsed ? "展開側欄" : "收合側欄"}
-              aria-label={sidebarCollapsed ? "展開側欄" : "收合側欄"}
-            >
-              {sidebarCollapsed ? (
-                <PanelLeftOpen className="h-4 w-4" />
-              ) : (
-                <PanelLeftClose className="h-4 w-4" />
-              )}
-            </button>
+    <header className="relative z-10 border-b border-white/8 bg-surface/50 px-4 py-2.5 backdrop-blur-xl sm:px-6">
+      <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3">
+        {/* 左側：側欄切換 + 頁面標題 */}
+        <div className="flex min-w-0 items-center gap-2.5">
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/[0.04] text-slate-400 hover:text-white lg:flex"
+            title={sidebarCollapsed ? "展開側欄" : "收合側欄"}
+          >
+            {sidebarCollapsed ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </button>
 
-            <div className="section-kicker">{meta.eyebrow}</div>
-          </div>
-
-          <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:gap-4">
-            <div className="min-w-0">
-              <h2 className="display-title text-2xl sm:text-[30px]">{meta.title}</h2>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
-                {meta.description}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <span className="signal-chip">
-                <Sparkles className="h-3.5 w-3.5 text-brand-300" />
-                Offline First
-              </span>
-              <span className="signal-chip">
-                <Clock3 className="h-3.5 w-3.5 text-accent-300" />
-                {now}
-              </span>
-            </div>
-          </div>
+          <span className="section-kicker shrink-0">{meta.eyebrow}</span>
+          <h2 className="truncate text-sm font-semibold text-white">{meta.title}</h2>
+          <p className="hidden truncate text-xs text-slate-500 sm:block">{meta.description}</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-          <div className="panel-soft flex items-center gap-3 rounded-[22px] px-3 py-2.5">
+        {/* 右側：狀態 + 使用者 */}
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="signal-chip hidden !py-0.5 !text-[10px] sm:flex">
+            <Sparkles className="h-3 w-3 text-brand-300" />
+            Offline First
+          </span>
+          <span className="signal-chip !py-0.5 !text-[10px]">
+            <Clock3 className="h-3 w-3 text-accent-300" />
+            {now}
+          </span>
+
+          <div className="flex items-center gap-2 rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1.5">
             {user?.image ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={user.image}
                 alt={user.name ?? "user"}
-                className="h-11 w-11 rounded-2xl border border-white/10 object-cover"
+                className="h-7 w-7 rounded-xl border border-white/10 object-cover"
               />
             ) : (
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-brand-400/20 bg-brand-500/10 text-sm font-semibold text-white">
+              <div className="flex h-7 w-7 items-center justify-center rounded-xl border border-brand-400/20 bg-brand-500/10 text-xs font-semibold text-white">
                 {initials}
               </div>
             )}
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white">
-                {user?.name ?? "現場操作員"}
-              </p>
-              <p className="truncate text-xs text-slate-500">
-                {user?.email ?? "本地安全登入"}
-              </p>
-            </div>
+            <span className="hidden max-w-[120px] truncate text-xs font-medium text-white sm:block">
+              {user?.name ?? "現場操作員"}
+            </span>
             <button
               onClick={() => signOut({ callbackUrl: "/auth/login" })}
-              className="ghost-button px-3 py-2 text-xs"
+              className="ghost-button !px-2 !py-1 !text-[10px]"
               title="登出"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-3 w-3" />
               登出
             </button>
           </div>

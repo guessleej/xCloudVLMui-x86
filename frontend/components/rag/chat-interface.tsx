@@ -16,11 +16,12 @@ import { ragApi } from "@/lib/api";
 import type { RagMessage } from "@/types";
 
 const SUGGESTED = [
-  "壓縮機軸承異音該如何排查？",
-  "散熱風扇效率下降的常見原因與清潔 SOP？",
-  "液壓密封圈滲油的標準維修步驟是什麼？",
-  "VHS 分數跌破 40 時，第一線要先做哪些事？",
-  "輸送帶邊緣龜裂時，預防維護工單應如何描述？",
+  "壓縮機軸承異音如何排查？",
+  "散熱風扇效率下降的清潔 SOP？",
+  "液壓密封圈滲油的維修步驟？",
+  "VHS 跌破 40 第一線先做什麼？",
+  "輸送帶邊緣龜裂工單如何描述？",
+  "設備停機前有哪些先期徵兆？",
 ];
 
 export default function ChatInterface() {
@@ -35,6 +36,13 @@ export default function ChatInterface() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [input]);
+
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim() || loading) return;
@@ -48,6 +56,7 @@ export default function ChatInterface() {
 
       setMessages((current) => [...current, userMessage]);
       setInput("");
+      if (inputRef.current) inputRef.current.style.height = "auto";
       setLoading(true);
 
       try {
@@ -71,11 +80,9 @@ export default function ChatInterface() {
           role: "assistant",
           content:
             `RAG 服務暫時無法連線。\n\n` +
-            `錯誤資訊：${error?.response?.data?.detail ?? error.message}\n\n` +
-            `請確認後端、向量索引與 llama.cpp 已完成啟動。`,
+            `錯誤：${error?.response?.data?.detail ?? error.message}`,
           created_at: new Date().toISOString(),
         };
-
         setMessages((current) => [...current, assistantMessage]);
       } finally {
         setLoading(false);
@@ -85,177 +92,128 @@ export default function ChatInterface() {
     [loading, sessionId]
   );
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
       sendMessage(input);
     }
   };
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-white/8 px-5 py-5 sm:px-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="section-kicker">RAG Conversation Deck</div>
-            <h2 className="mt-3 text-2xl font-semibold text-white">維修問答工作區</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-400">
-              將維修手冊、SOP 與歷史工單整合為可追溯的回答，協助現場快速決策。
-            </p>
-          </div>
 
-          {messages.length > 0 && (
-            <button onClick={() => setMessages([])} className="ghost-button">
-              <Trash2 className="h-4 w-4" />
-              清除對話
-            </button>
-          )}
-        </div>
+      {/* ── 訊息捲動區 ──────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 sm:px-5">
+        {messages.length === 0 ? (
+          /* 空狀態：置中提示 */
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+            <Search className="h-8 w-8 text-slate-600" />
+            <p className="text-sm text-slate-500">搜尋維修手冊、SOP 與工單知識庫</p>
+            <p className="text-xs text-slate-600">由 Gemma 4 E4B 生成可追溯回答</p>
+          </div>
+        ) : (
+          /* 對話訊息 */
+          <div className="space-y-4">
+            <div className="flex justify-end">
+              <button onClick={() => setMessages([])} className="ghost-button !py-0.5 !text-xs">
+                <Trash2 className="h-3.5 w-3.5" />清除
+              </button>
+            </div>
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex gap-2.5 ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}
+              >
+                <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border ${
+                  message.role === "user"
+                    ? "border-brand-400/20 bg-brand-500/10"
+                    : "border-white/10 bg-slate-950/35"
+                }`}>
+                  {message.role === "user"
+                    ? <User className="h-3.5 w-3.5 text-white" />
+                    : <Search className="h-3.5 w-3.5 text-accent-200" />}
+                </div>
+
+                <div className={message.role === "user" ? "chat-bubble-user max-w-[86%]" : "chat-bubble-ai max-w-[90%]"}>
+                  {message.role === "assistant" ? (
+                    <div className="markdown-body text-sm">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="text-sm leading-6">{message.content}</p>
+                  )}
+
+                  {message.sources && message.sources.length > 0 && (
+                    <div className="mt-3 border-t border-white/8 pt-3">
+                      <p className="mb-1.5 text-[10px] uppercase tracking-[0.2em] text-slate-500">來源</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {message.sources.map((s, i) => (
+                          <span key={`${s.filename}-${i}`} className="table-chip">
+                            {s.filename}{s.page && ` p.${s.page}`}{s.score !== undefined && ` ${(s.score * 100).toFixed(0)}%`}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {loading && (
+              <div className="flex gap-2.5">
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border border-white/10 bg-slate-950/35">
+                  <Search className="h-3.5 w-3.5 text-accent-200" />
+                </div>
+                <div className="chat-bubble-ai flex items-center gap-2">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-300" />
+                  <span className="text-sm text-slate-300">正在檢索知識庫...</span>
+                </div>
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+        )}
       </div>
 
-      {messages.length === 0 ? (
-        <div className="flex flex-1 flex-col justify-center px-5 py-8 sm:px-6">
-          <div className="panel-grid overflow-hidden rounded-[30px] p-6">
-            <div className="relative z-10">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-accent-400/20 bg-accent-400/10">
-                <Search className="h-6 w-6 text-accent-200" />
-              </div>
-              <h3 className="mt-5 text-2xl font-semibold text-white">
-                從知識庫萃取可執行的維護答案
-              </h3>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-                問題可以直接描述設備異常、老化徵兆、維修步驟或工單內容。我們會先搜尋
-                SEGMA RAG，再交由 Gemma 4 E4B 生成可讀、可追溯的回答。
-              </p>
-
-              <div className="mt-6 flex flex-wrap gap-2">
-                <span className="signal-chip">
-                  <BookOpenText className="h-3.5 w-3.5 text-accent-300" />
-                  維修手冊
-                </span>
-                <span className="signal-chip">
-                  <Sparkles className="h-3.5 w-3.5 text-brand-300" />
-                  SOP / 歷史工單
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-3 lg:grid-cols-2">
-            {SUGGESTED.map((question) => (
+      {/* ── 建議問題（僅無訊息時顯示）──────────────────── */}
+      {messages.length === 0 && (
+        <div className="px-4 pb-2 sm:px-5">
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+            {SUGGESTED.map((q) => (
               <button
-                key={question}
-                onClick={() => sendMessage(question)}
-                className="rounded-[24px] border border-white/8 bg-white/[0.04] px-4 py-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-accent-400/25 hover:bg-accent-400/10"
+                key={q}
+                onClick={() => sendMessage(q)}
+                className="rounded-xl border border-white/8 bg-white/[0.03] px-2.5 py-2 text-left text-[11px] leading-4 text-slate-400 transition-colors hover:border-accent-400/30 hover:bg-accent-400/8 hover:text-slate-200"
               >
-                <p className="text-sm leading-6 text-slate-200">{question}</p>
+                {q}
               </button>
             ))}
           </div>
         </div>
-      ) : (
-        <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex gap-3 ${
-                message.role === "user" ? "flex-row-reverse" : "flex-row"
-              }`}
-            >
-              <div
-                className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border ${
-                  message.role === "user"
-                    ? "border-brand-400/20 bg-brand-500/10"
-                    : "border-white/10 bg-slate-950/35"
-                }`}
-              >
-                {message.role === "user" ? (
-                  <User className="h-4 w-4 text-white" />
-                ) : (
-                  <Search className="h-4 w-4 text-accent-200" />
-                )}
-              </div>
-
-              <div className={message.role === "user" ? "chat-bubble-user max-w-[86%]" : "chat-bubble-ai max-w-[90%]"}>
-                {message.role === "assistant" ? (
-                  <div className="markdown-body">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {message.content}
-                    </ReactMarkdown>
-                  </div>
-                ) : (
-                  <p className="text-sm leading-7">{message.content}</p>
-                )}
-
-                {message.sources && message.sources.length > 0 && (
-                  <div className="mt-4 border-t border-white/8 pt-4">
-                    <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
-                      參考來源
-                    </p>
-                    <div className="mt-3 grid gap-2">
-                      {message.sources.map((source, index) => (
-                        <div
-                          key={`${source.filename}-${index}`}
-                          className="rounded-[20px] border border-white/8 bg-slate-950/40 px-3 py-3"
-                        >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="table-chip">{source.filename}</span>
-                            {source.page && <span className="table-chip">p.{source.page}</span>}
-                            {source.score !== undefined && (
-                              <span className="table-chip">
-                                相似度 {(source.score * 100).toFixed(0)}%
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-
-          {loading && (
-            <div className="flex gap-3">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/35">
-                <Search className="h-4 w-4 text-accent-200" />
-              </div>
-              <div className="chat-bubble-ai flex items-center gap-3">
-                <Loader2 className="h-4 w-4 animate-spin text-brand-300" />
-                <span className="text-sm text-slate-300">
-                  正在檢索手冊、歷史工單與相關 SOP...
-                </span>
-              </div>
-            </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
       )}
 
-      <div className="border-t border-white/8 px-5 py-5 sm:px-6">
-        <div className="flex items-end gap-3">
-          <div className="flex-1">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="輸入設備問題、維修需求或工單內容，Enter 送出，Shift + Enter 換行..."
-              rows={1}
-              className="min-h-[84px] w-full resize-none rounded-[26px] border border-white/10 bg-white/[0.04] px-5 py-4 text-sm leading-7 text-slate-100 placeholder:text-slate-500 focus:border-accent-400/30 focus:outline-none focus:ring-2 focus:ring-accent-400/10"
-            />
-          </div>
+      {/* ── 輸入列 ──────────────────────────────────────── */}
+      <div className="border-t border-white/8 px-4 py-2.5 sm:px-5">
+        <div className="flex items-end gap-2">
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="輸入設備問題或維修需求，Enter 送出，Shift+Enter 換行…"
+            rows={1}
+            className="min-h-[44px] max-h-[160px] flex-1 resize-none overflow-y-auto rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm leading-6 text-slate-100 placeholder:text-slate-500 focus:border-accent-400/30 focus:outline-none focus:ring-2 focus:ring-accent-400/10"
+          />
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim() || loading}
-            className="primary-button h-[84px] min-w-[84px] rounded-[26px] px-0"
+            className="primary-button h-11 w-11 shrink-0 rounded-2xl px-0 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <Send className="h-5 w-5" />
+            <Send className="h-4 w-4" />
           </button>
         </div>
-        <p className="mt-3 text-center text-xs text-slate-500">
-          本地推論、資料留在裝置端，可搭配文件管理區更新知識來源。
+        <p className="mt-1.5 text-center text-[10px] text-slate-600">
+          本地推論 · 資料留在裝置端 · 可在文件管理更新知識來源
         </p>
       </div>
     </div>

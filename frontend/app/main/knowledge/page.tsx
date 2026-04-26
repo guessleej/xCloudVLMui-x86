@@ -661,7 +661,7 @@ export default function KnowledgePage() {
 
       {/* ── Tab: 知識問答 ── */}
       {activeTab === "chat" && (
-        <div className="panel-soft overflow-hidden rounded-2xl" style={{ height: "calc(100svh - 170px)" }}>
+        <div className="panel-soft overflow-hidden rounded-2xl" style={{ height: "calc(100svh - 200px)" }}>
           <ChatInterface />
         </div>
       )}
