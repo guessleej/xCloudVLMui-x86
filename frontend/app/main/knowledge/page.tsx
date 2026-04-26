@@ -5,8 +5,11 @@ import {
   AlertTriangle,
   BookOpenText,
   CheckCircle2,
+  CheckSquare,
+  ChevronDown,
   Clock,
   Database,
+  Download,
   Edit2,
   FileImage,
   FileText,
@@ -18,6 +21,7 @@ import {
   ScanLine,
   Search,
   Settings2,
+  Square,
   Trash2,
   Upload,
   X,
@@ -70,17 +74,17 @@ function DocCard({ doc, onDelete }: { doc: RagDocument; onDelete: (id: string) =
   const isImage = doc.file_type === "image";
 
   return (
-    <div className="rounded-[24px] border border-white/8 bg-white/[0.035] p-4 transition-colors hover:border-white/15 hover:bg-white/[0.05]">
+    <div className="rounded-xl border border-white/8 bg-white/[0.035] p-3 transition-colors hover:border-white/15 hover:bg-white/[0.05]">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
           <div
-            className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border ${
+            className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl border ${
               isImage
                 ? "border-purple-400/20 bg-purple-400/10"
                 : "border-brand-400/20 bg-brand-400/10"
             }`}
           >
-            <Icon className={`h-5 w-5 ${isImage ? "text-purple-300" : "text-brand-300"}`} />
+            <Icon className={`h-3.5 w-3.5 ${isImage ? "text-purple-300" : "text-brand-300"}`} />
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-white">{doc.filename}</p>
@@ -94,11 +98,11 @@ function DocCard({ doc, onDelete }: { doc: RagDocument; onDelete: (id: string) =
           className="ghost-button h-8 w-8 flex-shrink-0 rounded-xl px-0 text-slate-500 hover:text-red-400"
           title="刪除"
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <span className="table-chip uppercase">{doc.file_type}</span>
         {doc.embedded ? (
           <span className="status-pill status-pill-ok">
@@ -120,7 +124,7 @@ function DocCard({ doc, onDelete }: { doc: RagDocument; onDelete: (id: string) =
       </div>
 
       {doc.description && (
-        <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500">{doc.description}</p>
+        <p className="mt-2 line-clamp-2 text-xs leading-4 text-slate-500">{doc.description}</p>
       )}
     </div>
   );
@@ -131,10 +135,16 @@ function HistoryCard({
   item,
   onDelete,
   onEditNotes,
+  selectionMode,
+  isSelected,
+  onToggleSelect,
 }: {
-  item:         ChatHistoryItem;
-  onDelete:     (id: string) => void;
-  onEditNotes:  (id: string, notes: string) => void;
+  item:           ChatHistoryItem;
+  onDelete:       (id: string) => void;
+  onEditNotes:    (id: string, notes: string) => void;
+  selectionMode?: boolean;
+  isSelected?:    boolean;
+  onToggleSelect?: (id: string) => void;
 }) {
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue,   setNotesValue]   = useState(item.notes ?? "");
@@ -156,43 +166,63 @@ function HistoryCard({
   };
 
   return (
-    <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-5 transition-colors hover:border-white/12">
+    <div
+      onClick={selectionMode ? () => onToggleSelect?.(item.id) : undefined}
+      className={`rounded-xl border p-3 transition-colors ${
+        selectionMode ? "cursor-pointer" : ""
+      } ${
+        isSelected
+          ? "border-brand-500/40 bg-brand-500/10"
+          : "border-white/8 bg-white/[0.03] hover:border-white/12"
+      }`}
+    >
       {/* 問題 */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2.5 min-w-0">
-          <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-brand-500/20">
-            <MessageSquare className="h-3.5 w-3.5 text-brand-300" />
-          </div>
+          {selectionMode ? (
+            <div className="mt-0.5 flex-shrink-0 text-brand-400">
+              {isSelected
+                ? <CheckSquare className="h-5 w-5" />
+                : <Square className="h-5 w-5 text-slate-500" />
+              }
+            </div>
+          ) : (
+            <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-brand-500/20">
+              <MessageSquare className="h-3.5 w-3.5 text-brand-300" />
+            </div>
+          )}
           <p className="text-sm font-semibold text-white leading-5">{item.question}</p>
         </div>
-        <div className="flex flex-shrink-0 items-center gap-1">
-          <button
-            onClick={() => { setEditingNotes(true); setTimeout(() => textRef.current?.focus(), 50); }}
-            className="ghost-button h-7 w-7 rounded-xl px-0 text-slate-500 hover:text-brand-300"
-            title="編輯備註"
-          >
-            <Edit2 className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => onDelete(item.id)}
-            className="ghost-button h-7 w-7 rounded-xl px-0 text-slate-500 hover:text-red-400"
-            title="刪除"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        {!selectionMode && (
+          <div className="flex flex-shrink-0 items-center gap-1">
+            <button
+              onClick={() => { setEditingNotes(true); setTimeout(() => textRef.current?.focus(), 50); }}
+              className="ghost-button h-7 w-7 rounded-xl px-0 text-slate-500 hover:text-brand-300"
+              title="編輯備註"
+            >
+              <Edit2 className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => onDelete(item.id)}
+              className="ghost-button h-7 w-7 rounded-xl px-0 text-slate-500 hover:text-red-400"
+              title="刪除"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 回答摘要 */}
-      <div className="mt-3 rounded-[16px] border border-white/6 bg-slate-950/40 px-4 py-3">
-        <p className="text-xs leading-5 text-slate-400 line-clamp-3">
+      <div className="mt-2 rounded-xl border border-white/6 bg-slate-950/40 px-3 py-2">
+        <p className="text-xs leading-4 text-slate-400 line-clamp-3">
           {item.answer.replace(/#+\s*/g, "").replace(/\*\*/g, "").trim().slice(0, 280)}
           {item.answer.length > 280 && "…"}
         </p>
       </div>
 
       {/* 來源 + 時間 */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         {item.sources && item.sources.length > 0 && (
           <span className="status-pill bg-emerald-400/10 text-emerald-300 border-emerald-400/20">
             <Database className="h-3 w-3" />
@@ -210,14 +240,14 @@ function HistoryCard({
 
       {/* 備註區 */}
       {editingNotes ? (
-        <div className="mt-3 space-y-2">
+        <div className="mt-2 space-y-2">
           <textarea
             ref={textRef}
             value={notesValue}
             onChange={(e) => setNotesValue(e.target.value)}
             placeholder="輸入備註（選填）…"
             rows={2}
-            className="w-full rounded-[16px] border border-white/12 bg-slate-950/50 px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-brand-500/40 focus:outline-none resize-none"
+            className="w-full rounded-xl border border-white/12 bg-slate-950/50 px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-brand-500/40 focus:outline-none resize-none"
           />
           <div className="flex items-center gap-2">
             <button
@@ -237,7 +267,7 @@ function HistoryCard({
           </div>
         </div>
       ) : item.notes ? (
-        <div className="mt-3 flex items-start gap-2 rounded-[14px] border border-brand-400/15 bg-brand-400/5 px-3 py-2">
+        <div className="mt-2 flex items-start gap-2 rounded-xl border border-brand-400/15 bg-brand-400/5 px-3 py-2">
           <Edit2 className="mt-0.5 h-3 w-3 flex-shrink-0 text-brand-400" />
           <p className="text-xs text-slate-400">{item.notes}</p>
         </div>
@@ -265,6 +295,9 @@ export default function KnowledgePage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyOffset, setHistoryOffset] = useState(0);
   const [historySearch, setHistorySearch] = useState("");
+  const [selectedIds,   setSelectedIds]   = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const HISTORY_LIMIT = 20;
 
   const IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"];
@@ -344,6 +377,141 @@ export default function KnowledgePage() {
       prev.map((h) => h.id === id ? { ...h, notes: notes || undefined } : h)
     );
   };
+
+  /* ── 批次刪除選取項目 ── */
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`確定要刪除選取的 ${selectedIds.size} 筆記錄嗎？`)) return;
+    const ids = Array.from(selectedIds);
+    let success = 0;
+    for (const id of ids) {
+      try { await chatHistoryApi.delete(id); success++; } catch { /* skip */ }
+    }
+    setHistoryItems((prev) => prev.filter((h) => !selectedIds.has(h.id)));
+    setHistoryTotal((v) => v - success);
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+    toast.success(`已刪除 ${success} 筆記錄`);
+  };
+
+  /* ── 切換單筆選取 ── */
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  /* ── 全選 / 取消全選 ── */
+  const toggleSelectAll = () => {
+    if (selectedIds.size === historyItems.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(historyItems.map((h) => h.id)));
+    }
+  };
+
+  /* ── 匯出工具函式 ── */
+  const buildExportItems = () =>
+    selectionMode && selectedIds.size > 0
+      ? historyItems.filter((h) => selectedIds.has(h.id))
+      : historyItems;
+
+  const handleExportMd = () => {
+    const items = buildExportItems();
+    const lines: string[] = [
+      `# 問答歷史記錄`,
+      ``,
+      `> 匯出時間：${new Date().toLocaleString("zh-TW")}　共 ${items.length} 筆`,
+      ``,
+      `---`,
+      ``,
+    ];
+    items.forEach((item, i) => {
+      lines.push(`## 第 ${i + 1} 筆　${new Date(item.created_at).toLocaleString("zh-TW")}`);
+      if (item.latency_ms) lines.push(`_推論耗時：${item.latency_ms} ms_`);
+      lines.push(``, `**問題**`, ``, item.question, ``, `**回答**`, ``);
+      lines.push(item.answer, ``);
+      if (item.sources?.length) {
+        lines.push(`**來源文件**`, ``);
+        item.sources.forEach((s: any) =>
+          lines.push(`- ${s.filename ?? "未知"}${s.score ? `（相似度 ${(s.score * 100).toFixed(1)}%）` : ""}`)
+        );
+        lines.push(``);
+      }
+      if (item.notes) lines.push(`**備註：** ${item.notes}`, ``);
+      lines.push(`---`, ``);
+    });
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
+    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `問答歷史_${Date.now()}.md` });
+    a.click(); URL.revokeObjectURL(a.href);
+    toast.success("Markdown 已下載");
+    setExportMenuOpen(false);
+  };
+
+  const handleExportPdf = () => {
+    const items = buildExportItems();
+    const rows = items.map((item, i) => `
+      <div class="item">
+        <h2>${i + 1}. ${escHtml(item.question)}</h2>
+        <div class="meta">${new Date(item.created_at).toLocaleString("zh-TW")}${item.latency_ms ? `　${item.latency_ms} ms` : ""}</div>
+        <div class="answer">${escHtml(item.answer).replace(/\n/g, "<br>")}</div>
+        ${item.sources?.length ? `<div class="sources">📚 來源：${(item.sources as any[]).map((s: any) => s.filename ?? "").join("、")}</div>` : ""}
+        ${item.notes ? `<div class="notes">📝 ${escHtml(item.notes)}</div>` : ""}
+      </div>`).join("");
+    const html = `<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>問答歷史</title>
+      <style>
+        body{font-family:"Microsoft JhengHei","PingFang TC",sans-serif;max-width:800px;margin:0 auto;padding:24px;color:#111;}
+        h1{color:#1d4ed8;border-bottom:2px solid #1d4ed8;padding-bottom:8px;}
+        h2{color:#1e40af;font-size:15px;margin-top:24px;}
+        .meta{color:#6b7280;font-size:12px;margin-bottom:8px;}
+        .answer{background:#f8fafc;border-left:3px solid #3b82f6;padding:10px 12px;white-space:pre-wrap;font-size:13px;line-height:1.6;}
+        .sources{margin-top:6px;font-size:12px;color:#059669;}
+        .notes{margin-top:6px;font-size:12px;color:#7c3aed;background:#faf5ff;padding:6px 10px;border-radius:4px;}
+        .item{page-break-inside:avoid;border-bottom:1px solid #e5e7eb;padding-bottom:16px;}
+        @media print{body{padding:0;}h1{font-size:18px;}}
+      </style></head>
+      <body><h1>問答歷史記錄</h1>
+      <p style="color:#6b7280;font-size:13px">匯出時間：${new Date().toLocaleString("zh-TW")}　共 ${items.length} 筆</p>
+      ${rows}</body></html>`;
+    const win = window.open("", "_blank", "width=900,height=700");
+    if (!win) { toast.error("請允許彈出視窗以列印 PDF"); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 600);
+    setExportMenuOpen(false);
+  };
+
+  const handleExportWord = () => {
+    const items = buildExportItems();
+    const rows = items.map((item, i) => `
+      <h2>${i + 1}. ${escHtml(item.question)}</h2>
+      <p style="color:#6b7280;font-size:12px">${new Date(item.created_at).toLocaleString("zh-TW")}${item.latency_ms ? `　${item.latency_ms} ms` : ""}</p>
+      <div style="background:#eff6ff;border-left:3px solid #3b82f6;padding:8px 12px;margin:8px 0">
+        ${escHtml(item.answer).replace(/\n/g, "<br>")}
+      </div>
+      ${item.sources?.length ? `<p style="color:#059669;font-size:12px">📚 來源：${(item.sources as any[]).map((s: any) => s.filename ?? "").join("、")}</p>` : ""}
+      ${item.notes ? `<p style="color:#7c3aed;font-size:12px">📝 ${escHtml(item.notes)}</p>` : ""}
+      <hr/>`).join("");
+    const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head><meta charset='utf-8'><title>問答歷史</title>
+      <style>body{font-family:"Microsoft JhengHei",Arial;} h1{color:#1d4ed8;} h2{color:#1e40af;font-size:14pt;margin-top:18pt;}</style>
+      </head><body>
+      <h1>問答歷史記錄</h1>
+      <p style="color:#6b7280">匯出時間：${new Date().toLocaleString("zh-TW")}　共 ${items.length} 筆</p>
+      ${rows}</body></html>`;
+    const blob = new Blob(["﻿", html], { type: "application/msword;charset=utf-8" });
+    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `問答歷史_${Date.now()}.doc` });
+    a.click(); URL.revokeObjectURL(a.href);
+    toast.success("Word 文件已下載");
+    setExportMenuOpen(false);
+  };
+
+  function escHtml(s: string) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
 
   /* ── 文件刪除 ── */
   const handleDelete = async (id: string) => {
@@ -433,121 +601,79 @@ export default function KnowledgePage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* ── Header ── */}
-      <section className="panel-grid overflow-hidden rounded-[32px] p-6 sm:p-7 lg:p-8">
-        <div className="relative z-10 grid gap-6 xl:grid-cols-[1.25fr_0.9fr]">
-          <div>
-            <div className="section-kicker">Knowledge Ops</div>
-            <h1 className="display-title mt-4 text-3xl leading-tight sm:text-[40px]">
-              知識作業台
-            </h1>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
-              上傳維修手冊、SOP 與現場圖片，透過 OCR 與向量嵌入建立可語意搜尋的知識庫，
-              再以 AI 問答方式直接提取診斷依據。問答歷史自動儲存，可隨時查閱、編輯備註或刪除。
-            </p>
-            <div className="mt-6 flex flex-wrap gap-2">
-              <span className="signal-chip">
-                <FileText className="h-3.5 w-3.5 text-brand-300" />
-                PDF / TXT / MD / CSV
-              </span>
-              <span className="signal-chip">
-                <FileImage className="h-3.5 w-3.5 text-purple-300" />
-                JPG / PNG / WEBP (OCR)
-              </span>
-              <span className="signal-chip">
-                <Layers className="h-3.5 w-3.5 text-emerald-300" />
-                ChromaDB 向量索引
-              </span>
-              <span className="signal-chip">
-                <BookOpenText className="h-3.5 w-3.5 text-accent-300" />
-                RAG 語意問答
-              </span>
-            </div>
+    <div className="flex flex-col gap-2">
+      {/* ── Header bar ── */}
+      <div className="rounded-2xl border border-white/8 bg-slate-900/60 px-3 py-2">
+        {/* Row 1: title + stats */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="section-kicker">Knowledge Ops</span>
+            <h2 className="text-sm font-semibold text-white">知識作業台</h2>
           </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
             {[
-              { label: "知識文件",   value: stats.total,    unit: "份" },
-              { label: "已建立索引", value: stats.embedded, unit: "份" },
-              { label: "向量段落",   value: stats.chunks,   unit: "段" },
-              { label: "問答歷史",   value: historyTotal,   unit: "筆" },
+              { label: "文件", value: stats.total,    unit: "份" },
+              { label: "索引", value: stats.embedded, unit: "份" },
+              { label: "段落", value: stats.chunks,   unit: "段" },
+              { label: "問答", value: historyTotal,   unit: "筆" },
             ].map(({ label, value, unit }) => (
-              <div key={label} className="rounded-[26px] border border-white/10 bg-white/[0.04] p-5">
-                <p className="text-xs uppercase tracking-[0.22em] text-slate-500">{label}</p>
-                <p className="mt-3 font-display text-3xl font-semibold text-white">
-                  {value}
-                  <span className="ml-1 text-base font-normal text-slate-400">{unit}</span>
-                </p>
-              </div>
+              <span key={label} className="flex items-baseline gap-0.5">
+                <span className="text-slate-500">{label}</span>
+                <span className="font-semibold text-white">{value}</span>
+                <span className="text-slate-500">{unit}</span>
+              </span>
             ))}
           </div>
         </div>
-      </section>
+        {/* Row 2: chips */}
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <span className="signal-chip !text-[10px] !py-0.5"><FileText  className="h-3 w-3 text-brand-300" />PDF / TXT / MD / CSV</span>
+          <span className="signal-chip !text-[10px] !py-0.5"><FileImage className="h-3 w-3 text-purple-300" />圖片 OCR</span>
+          <span className="signal-chip !text-[10px] !py-0.5"><Layers    className="h-3 w-3 text-emerald-300" />ChromaDB 向量索引</span>
+          <span className="signal-chip !text-[10px] !py-0.5"><BookOpenText className="h-3 w-3 text-accent-300" />RAG 語意問答</span>
+        </div>
+      </div>
 
-      {/* ── Tab Bar ── */}
-      <div className="flex items-center gap-1 rounded-[20px] border border-white/8 bg-white/[0.03] p-1 w-fit">
-        <button
-          onClick={() => setActiveTab("chat")}
-          className={`flex items-center gap-2 rounded-[16px] px-5 py-2.5 text-sm font-semibold transition-all ${
-            activeTab === "chat"
-              ? "bg-brand-600 text-white shadow-sm"
-              : "text-slate-400 hover:text-white"
-          }`}
-        >
-          <MessageSquare className="h-4 w-4" />
-          知識問答
-        </button>
-        <button
-          onClick={() => setActiveTab("history")}
-          className={`flex items-center gap-2 rounded-[16px] px-5 py-2.5 text-sm font-semibold transition-all ${
-            activeTab === "history"
-              ? "bg-brand-600 text-white shadow-sm"
-              : "text-slate-400 hover:text-white"
-          }`}
-        >
-          <History className="h-4 w-4" />
-          歷史記錄
-          {historyTotal > 0 && (
-            <span className="ml-1 rounded-full bg-white/15 px-2 py-0.5 text-xs">
-              {historyTotal}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab("manage")}
-          className={`flex items-center gap-2 rounded-[16px] px-5 py-2.5 text-sm font-semibold transition-all ${
-            activeTab === "manage"
-              ? "bg-brand-600 text-white shadow-sm"
-              : "text-slate-400 hover:text-white"
-          }`}
-        >
-          <Settings2 className="h-4 w-4" />
-          文件管理
-          {docs.length > 0 && (
-            <span className="ml-1 rounded-full bg-white/15 px-2 py-0.5 text-xs">
-              {docs.length}
-            </span>
-          )}
-        </button>
+      {/* ── Tab Bar — 全寬響應式 ── */}
+      <div className="flex items-center gap-1 rounded-xl border border-white/8 bg-white/[0.03] p-1">
+        {([
+          { key: "chat",    icon: MessageSquare, label: "知識問答",  badge: 0 },
+          { key: "history", icon: History,       label: "歷史記錄",  badge: historyTotal },
+          { key: "manage",  icon: Settings2,     label: "文件管理",  badge: docs.length },
+        ] as const).map(({ key, icon: Icon, label, badge }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all sm:flex-none sm:px-4 sm:text-sm ${
+              activeTab === key
+                ? "bg-brand-600 text-white shadow-sm"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span>{label}</span>
+            {badge > 0 && (
+              <span className="rounded-full bg-white/15 px-1.5 py-0.5 text-[10px]">{badge}</span>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* ── Tab: 知識問答 ── */}
       {activeTab === "chat" && (
-        <div className="panel-soft min-h-[820px] overflow-hidden rounded-[32px]">
+        <div className="panel-soft overflow-hidden rounded-2xl" style={{ height: "calc(100svh - 170px)" }}>
           <ChatInterface />
         </div>
       )}
 
       {/* ── Tab: 歷史記錄 ── */}
       {activeTab === "history" && (
-        <div className="panel-soft rounded-[32px] p-5 sm:p-6">
+        <div className="panel-soft rounded-2xl p-3 sm:p-4">
           {/* 工具列 */}
-          <div className="flex flex-col gap-4 border-b border-white/8 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 border-b border-white/8 pb-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Chat History</p>
-              <h2 className="mt-2 text-xl font-semibold text-white">
+              <h2 className="mt-1 text-sm font-semibold text-white">
                 問答歷史
                 <span className="ml-2 text-sm font-normal text-slate-500">
                   （共 {historyTotal} 筆）
@@ -556,34 +682,103 @@ export default function KnowledgePage() {
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {/* 搜尋 */}
-              <form onSubmit={handleSearchHistory} className="flex items-center gap-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500 pointer-events-none" />
-                  <input
-                    value={historySearch}
-                    onChange={(e) => setHistorySearch(e.target.value)}
-                    placeholder="搜尋問題…"
-                    className="h-9 w-48 rounded-[14px] border border-white/10 bg-white/[0.04] pl-8 pr-3 text-xs text-white placeholder-slate-600 focus:border-brand-500/40 focus:outline-none"
-                  />
-                </div>
-                <button type="submit" className="secondary-button h-9 text-xs px-3">
-                  搜尋
-                </button>
-              </form>
+              {!selectionMode && (
+                <form onSubmit={handleSearchHistory} className="flex items-center gap-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                    <input
+                      value={historySearch}
+                      onChange={(e) => setHistorySearch(e.target.value)}
+                      placeholder="搜尋問題…"
+                      className="h-9 w-48 rounded-xl border border-white/10 bg-white/[0.04] pl-8 pr-3 text-xs text-white placeholder-slate-600 focus:border-brand-500/40 focus:outline-none"
+                    />
+                  </div>
+                  <button type="submit" className="secondary-button h-9 text-xs px-3">
+                    搜尋
+                  </button>
+                </form>
+              )}
               {/* 重新整理 */}
-              <button
-                onClick={() => loadHistory(0, historySearch)}
-                disabled={historyLoading}
-                className="ghost-button h-9 w-9 rounded-[14px] px-0"
-                title="重新整理"
-              >
-                <RefreshCw className={`h-4 w-4 ${historyLoading ? "animate-spin" : ""}`} />
-              </button>
-              {/* 清空 */}
+              {!selectionMode && (
+                <button
+                  onClick={() => loadHistory(0, historySearch)}
+                  disabled={historyLoading}
+                  className="ghost-button h-9 w-9 rounded-xl px-0"
+                  title="重新整理"
+                >
+                  <RefreshCw className={`h-4 w-4 ${historyLoading ? "animate-spin" : ""}`} />
+                </button>
+              )}
+
+              {/* 批次選取模式切換 */}
               {historyItems.length > 0 && (
                 <button
+                  onClick={() => {
+                    setSelectionMode((v) => !v);
+                    setSelectedIds(new Set());
+                    setExportMenuOpen(false);
+                  }}
+                  className={`flex items-center gap-1.5 h-9 rounded-xl px-3 text-xs font-semibold transition-colors ${
+                    selectionMode
+                      ? "bg-brand-600/30 border border-brand-500/40 text-brand-300"
+                      : "ghost-button text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <CheckSquare className="h-3.5 w-3.5" />
+                  {selectionMode ? "取消選取" : "批次選取"}
+                </button>
+              )}
+
+              {/* 匯出下拉 */}
+              {historyItems.length > 0 && (
+                <div className="relative">
+                  <button
+                    onClick={() => setExportMenuOpen((v) => !v)}
+                    className="flex items-center gap-1.5 h-9 rounded-xl px-3 text-xs ghost-button text-slate-400 hover:text-white"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    匯出
+                    <ChevronDown className={`h-3 w-3 transition-transform ${exportMenuOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {exportMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setExportMenuOpen(false)} />
+                      <div className="absolute right-0 top-full z-50 mt-1 w-44 rounded-xl border border-white/12 bg-slate-900 shadow-xl py-1">
+                      <p className="px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] text-slate-600">
+                        {selectionMode && selectedIds.size > 0 ? `選取 ${selectedIds.size} 筆` : `全部 ${historyItems.length} 筆`}
+                      </p>
+                      <button
+                        onClick={handleExportMd}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-white/[0.06] hover:text-white"
+                      >
+                        <FileText className="h-3.5 w-3.5 text-brand-300" />
+                        匯出 Markdown
+                      </button>
+                      <button
+                        onClick={handleExportPdf}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-white/[0.06] hover:text-white"
+                      >
+                        <FileText className="h-3.5 w-3.5 text-red-300" />
+                        匯出 PDF（列印）
+                      </button>
+                      <button
+                        onClick={handleExportWord}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-white/[0.06] hover:text-white"
+                      >
+                        <FileText className="h-3.5 w-3.5 text-blue-300" />
+                        匯出 Word (.doc)
+                      </button>
+                    </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* 清空 */}
+              {historyItems.length > 0 && !selectionMode && (
+                <button
                   onClick={handleClearAllHistory}
-                  className="ghost-button h-9 rounded-[14px] px-3 text-xs text-slate-500 hover:text-red-400"
+                  className="ghost-button h-9 rounded-xl px-3 text-xs text-slate-500 hover:text-red-400"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   清空全部
@@ -592,16 +787,49 @@ export default function KnowledgePage() {
             </div>
           </div>
 
+          {/* 批次操作列 */}
+          {selectionMode && (
+            <div className="mt-3 flex items-center justify-between rounded-xl border border-brand-500/30 bg-brand-500/10 px-3 py-2">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={toggleSelectAll}
+                  className="flex items-center gap-1.5 text-xs text-brand-300 hover:text-brand-200 font-semibold"
+                >
+                  {selectedIds.size === historyItems.length
+                    ? <CheckSquare className="h-4 w-4" />
+                    : <Square className="h-4 w-4" />
+                  }
+                  {selectedIds.size === historyItems.length ? "取消全選" : "全選"}
+                </button>
+                <span className="text-xs text-slate-400">
+                  已選 <span className="font-semibold text-brand-300">{selectedIds.size}</span> / {historyItems.length} 筆
+                </span>
+              </div>
+              <button
+                onClick={handleBatchDelete}
+                disabled={selectedIds.size === 0}
+                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  selectedIds.size > 0
+                    ? "bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30"
+                    : "opacity-40 cursor-not-allowed text-slate-500"
+                }`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                刪除選取（{selectedIds.size}）
+              </button>
+            </div>
+          )}
+
           {/* 歷史列表 */}
-          <div className="mt-4 space-y-3 overflow-y-auto" style={{ maxHeight: "65vh" }}>
+          <div className="mt-2 space-y-3 overflow-y-auto" style={{ maxHeight: "65vh" }}>
             {historyLoading && historyItems.length === 0 ? (
               <div className="flex items-center justify-center py-16">
                 <RefreshCw className="h-6 w-6 animate-spin text-slate-500" />
               </div>
             ) : historyItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <History className="h-10 w-10 text-slate-600" />
-                <p className="mt-4 text-sm text-slate-500">
+                <History className="h-7 w-7 text-slate-600" />
+                <p className="mt-2 text-sm text-slate-500">
                   {historySearch
                     ? "找不到符合的問答記錄。"
                     : "尚無問答歷史，切換至「知識問答」開始提問。"}
@@ -615,6 +843,9 @@ export default function KnowledgePage() {
                     item={item}
                     onDelete={handleDeleteHistory}
                     onEditNotes={handleEditNotes}
+                    selectionMode={selectionMode}
+                    isSelected={selectedIds.has(item.id)}
+                    onToggleSelect={toggleSelect}
                   />
                 ))}
                 {/* 載入更多 */}
@@ -638,30 +869,30 @@ export default function KnowledgePage() {
 
       {/* ── Tab: 文件管理 ── */}
       {activeTab === "manage" && (
-        <div className="grid gap-6 xl:grid-cols-[1fr_1.5fr]">
+        <div className="grid gap-3 lg:grid-cols-[1fr_1.5fr]">
           {/* 上傳區 */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
-              className={`rounded-[30px] border-2 border-dashed p-8 text-center transition-colors ${
+              className={`rounded-2xl border-2 border-dashed p-4 text-center transition-colors ${
                 dragOver
                   ? "border-brand-400/60 bg-brand-400/10"
                   : "border-white/15 bg-white/[0.02] hover:border-white/25 hover:bg-white/[0.04]"
               }`}
             >
               <div className="flex justify-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05]">
-                  <Upload className="h-7 w-7 text-slate-300" />
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05]">
+                  <Upload className="h-3.5 w-3.5 text-slate-300" />
                 </div>
               </div>
-              <p className="mt-4 text-sm font-semibold text-white">拖曳檔案至此上傳</p>
-              <p className="mt-2 text-xs leading-5 text-slate-500">
+              <p className="mt-2 text-sm font-semibold text-white">拖曳檔案至此上傳</p>
+              <p className="mt-1 text-[11px] leading-4 text-slate-500">
                 支援文件（PDF、TXT、MD、CSV）<br />
                 與圖片（JPG、PNG、WEBP）— 圖片自動進行 OCR
               </p>
-              <div className="mt-6 flex justify-center gap-3">
+              <div className="mt-3 flex justify-center gap-3">
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="secondary-button"
@@ -697,14 +928,14 @@ export default function KnowledgePage() {
 
             {/* 上傳進度佇列 */}
             {queue.length > 0 && (
-              <div className="panel-soft rounded-[28px] p-4 space-y-3">
+              <div className="panel-soft rounded-xl p-3 space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                   上傳進度
                 </p>
                 {queue.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-[20px] border border-white/8 bg-slate-950/30 px-4 py-3"
+                    className="rounded-xl border border-white/8 bg-slate-950/30 px-3 py-2"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="truncate text-sm font-medium text-white">{item.file.name}</p>
@@ -737,7 +968,7 @@ export default function KnowledgePage() {
             )}
 
             {/* 使用建議 */}
-            <div className="panel-soft rounded-[28px] p-5 space-y-3">
+            <div className="panel-soft rounded-xl p-3 space-y-3">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                 建議作法
               </p>
@@ -748,29 +979,29 @@ export default function KnowledgePage() {
               ].map((tip) => (
                 <div
                   key={tip}
-                  className="flex items-start gap-3 rounded-[18px] border border-white/8 bg-slate-950/30 px-4 py-3"
+                  className="flex items-start gap-3 rounded-xl border border-white/8 bg-slate-950/30 px-3 py-2"
                 >
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-300" />
-                  <p className="text-xs leading-5 text-slate-400">{tip}</p>
+                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-emerald-300" />
+                  <p className="text-[11px] leading-4 text-slate-400">{tip}</p>
                 </div>
               ))}
             </div>
           </div>
 
           {/* 文件列表 */}
-          <div className="panel-soft rounded-[32px] p-5 sm:p-6">
-            <div className="flex flex-col gap-4 border-b border-white/8 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="panel-soft rounded-xl p-3 sm:p-4">
+            <div className="flex flex-col gap-3 border-b border-white/8 pb-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
                   Knowledge Index
                 </p>
-                <h2 className="mt-2 text-xl font-semibold text-white">
+                <h2 className="mt-1 text-sm font-semibold text-white">
                   知識庫文件
                   <span className="ml-2 text-sm font-normal text-slate-500">({filteredDocs.length})</span>
                 </h2>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex rounded-[16px] border border-white/10 bg-white/[0.04] p-1">
+                <div className="flex rounded-xl border border-white/10 bg-white/[0.04] p-1">
                   {(["all", "document", "image"] as const).map((t) => (
                     <button
                       key={t}
@@ -788,7 +1019,7 @@ export default function KnowledgePage() {
                 <button
                   onClick={loadDocs}
                   disabled={loading}
-                  className="ghost-button h-9 w-9 rounded-[14px] px-0"
+                  className="ghost-button h-9 w-9 rounded-xl px-0"
                   title="重新整理"
                 >
                   <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -796,15 +1027,15 @@ export default function KnowledgePage() {
               </div>
             </div>
 
-            <div className="mt-4 space-y-3 overflow-y-auto" style={{ maxHeight: "60vh" }}>
+            <div className="mt-2 space-y-3 overflow-y-auto" style={{ maxHeight: "60vh" }}>
               {loading && docs.length === 0 ? (
                 <div className="flex items-center justify-center py-16">
                   <RefreshCw className="h-6 w-6 animate-spin text-slate-500" />
                 </div>
               ) : filteredDocs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <Database className="h-10 w-10 text-slate-600" />
-                  <p className="mt-4 text-sm text-slate-500">
+                  <Database className="h-7 w-7 text-slate-600" />
+                  <p className="mt-2 text-sm text-slate-500">
                     {filterType === "all"
                       ? "知識庫尚無文件，請從左側上傳。"
                       : `尚無${filterType === "image" ? "圖片" : "文件"}類型的知識庫項目。`}
