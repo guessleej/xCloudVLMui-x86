@@ -1,19 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ElementType } from "react";
 import {
   AlertTriangle,
   ArrowRight,
   Camera,
+  Clock3,
   Cpu,
   Gauge,
+  MapPin,
   RefreshCw,
   ShieldAlert,
+  ShieldCheck,
   Sparkles,
   Waves,
 } from "lucide-react";
-import EquipmentCard from "@/components/dashboard/equipment-card";
 import EquipmentDetailDrawer from "@/components/dashboard/equipment-detail-drawer";
 import VhsChart from "@/components/dashboard/vhs-chart";
 import AnomalyFeed from "@/components/dashboard/anomaly-feed";
@@ -21,89 +22,131 @@ import PipelineFlow from "@/components/dashboard/pipeline-flow";
 import { dashboardApi } from "@/lib/api";
 import type { Alert, Equipment, EquipmentSummary, VhsTrendMeta } from "@/types";
 
+/* ─────────── Fallbacks ─────────── */
 const FALLBACK_EQUIP: Equipment[] = [];
 const FALLBACK_SUMMARY: EquipmentSummary = { total: 0, normal: 0, warning: 0, critical: 0, offline: 0 };
 
+/* ─────────── Status config ─────── */
+const S = {
+  normal:   { dot: "bg-emerald-400", pill: "status-pill status-pill-ok",    label: "穩定", bar: "from-emerald-400 to-accent-300",  icon: ShieldCheck  },
+  warning:  { dot: "bg-amber-400",   pill: "status-pill status-pill-warn",   label: "警戒", bar: "from-amber-300 to-brand-300",     icon: AlertTriangle },
+  critical: { dot: "bg-rose-400",    pill: "status-pill status-pill-danger", label: "危急", bar: "from-rose-400 to-brand-300",      icon: ShieldAlert  },
+  offline:  { dot: "bg-slate-500",   pill: "status-pill border-white/10 bg-white/[0.05] text-slate-400", label: "離線", bar: "from-slate-600 to-slate-400", icon: Clock3 },
+} as const;
+type StatusKey = keyof typeof S;
 
-
-function StatCard({
-  title,
-  value,
-  detail,
-  icon: Icon,
+/* ─────────── Compact equipment row ─────── */
+function EquipRow({
+  item,
+  active,
+  onClick,
+  onDetail,
 }: {
-  title: string;
-  value: number | string;
-  detail: string;
-  icon: ElementType;
+  item: Equipment;
+  active: boolean;
+  onClick: () => void;
+  onDetail: () => void;
 }) {
+  const cfg = S[(item.status as StatusKey) ?? "normal"] ?? S.normal;
+  const pct = Math.max(0, Math.min(100, item.vhs_score ?? 0));
+
   return (
-    <div className="metric-card p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-slate-500">{title}</p>
-          <p className="mt-3 font-display text-4xl font-semibold text-white">{value}</p>
-          <p className="mt-2 text-sm leading-6 text-slate-400">{detail}</p>
-        </div>
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/35">
-          <Icon className="h-5 w-5 text-accent-200" />
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick(); }}
+      className={`group flex cursor-pointer items-center gap-3 rounded-2xl border px-3 py-2.5 transition-all duration-200 ${
+        active
+          ? "border-accent-400/30 bg-accent-400/10 shadow-[0_0_0_1px_rgba(49,207,231,0.15)]"
+          : "border-white/6 bg-white/[0.025] hover:border-white/12 hover:bg-white/[0.04]"
+      }`}
+    >
+      {/* Status dot */}
+      <span
+        className={`h-2 w-2 shrink-0 rounded-full ${cfg.dot} ${item.status === "critical" ? "animate-pulse" : ""}`}
+      />
+
+      {/* Name + meta */}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-semibold text-white group-hover:text-accent-100">
+          {item.name}
+        </p>
+        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-slate-500">
+          <MapPin className="h-3 w-3 shrink-0" />
+          <span className="truncate">{item.location}</span>
+          <span className="text-white/20">·</span>
+          <span className="truncate">{item.type}</span>
         </div>
       </div>
+
+      {/* VHS score + bar */}
+      <div className="shrink-0 text-right">
+        <p className="text-[13px] font-semibold text-white">{(item.vhs_score ?? 0).toFixed(1)}</p>
+        <div className="mt-1 h-1 w-14 overflow-hidden rounded-full bg-white/8">
+          <div
+            className={`h-full rounded-full bg-gradient-to-r ${cfg.bar} transition-all duration-500`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Status badge */}
+      <span className={`${cfg.pill} shrink-0 !px-2 !py-0.5 !text-[10px]`}>{cfg.label}</span>
+
+      {/* Detail button */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onDetail(); }}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onDetail(); } }}
+        className="shrink-0 rounded-lg border border-white/8 bg-slate-950/30 px-2 py-1 text-[10px] font-medium text-slate-400 transition-colors hover:border-brand-400/30 hover:text-brand-300"
+      >
+        詳情
+      </button>
     </div>
   );
 }
 
-function getActionGuide(equipment: Equipment | null) {
-  if (!equipment) {
-    return {
-      title: "尚未選擇設備",
-      summary: "請從左側設備卡選擇目標設備，以檢視風險判讀與維護節奏。",
-      nextStep: "待命中",
-    };
-  }
-
-  if (equipment.status === "critical") {
-    return {
-      title: "立即停機檢查",
-      summary: "偵測到高風險異常，建議立刻中止設備運轉，避免造成二次損傷。",
-      nextStep: "P1 緊急維修工單",
-    };
-  }
-
-  if (equipment.status === "warning") {
-    return {
-      title: "排入本日處置",
-      summary: "設備已進入警戒區，請搭配 RAG 手冊與歷史工單安排預防性維護。",
-      nextStep: "P2 預防維護任務",
-    };
-  }
-
-  if (equipment.status === "offline") {
-    return {
-      title: "確認通訊與電源",
-      summary: "設備目前不在線，先確認鏡頭、網路與邊緣節點是否正常連線。",
-      nextStep: "通訊檢測",
-    };
-  }
-
-  return {
-    title: "維持巡檢節奏",
-    summary: "目前健康分數穩定，建議繼續按排程巡檢並追蹤長期退化趨勢。",
-    nextStep: "例行維護排程",
-  };
+/* ─────────── Action guide ───────── */
+function getGuide(e: Equipment | null) {
+  if (!e)                       return { title: "尚未選擇設備",   body: "點選設備列查看詳情與維護建議。",           next: "待命中" };
+  if (e.status === "critical")  return { title: "立即停機檢查",   body: "偵測到高風險異常，建議立刻中止運轉。",      next: "P1 緊急維修工單" };
+  if (e.status === "warning")   return { title: "排入本日處置",   body: "設備已進入警戒區，請安排預防性維護。",      next: "P2 預防維護任務" };
+  if (e.status === "offline")   return { title: "確認通訊與電源", body: "設備不在線，請確認網路與邊緣節點狀態。",    next: "通訊檢測" };
+  return                               { title: "維持巡檢節奏",   body: "健康分數穩定，按排程巡檢並追蹤長期趨勢。", next: "例行維護排程" };
 }
 
+function averageVhs(list: Equipment[]) {
+  if (!list.length) return 0;
+  return list.reduce((s, i) => s + (i.vhs_score ?? 0), 0) / list.length;
+}
+
+/* ─────────── KPI Chip ───────────── */
+function KpiChip({
+  label, value, sub, color,
+}: {
+  label: string; value: number | string; sub: string; color: string;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
+      <span className={`text-[10px] uppercase tracking-[0.2em] ${color}`}>{label}</span>
+      <span className="font-display text-2xl font-semibold leading-none text-white">{value}</span>
+      <span className="truncate text-[11px] text-slate-500">{sub}</span>
+    </div>
+  );
+}
+
+/* ─────────── Page ───────────────── */
 export default function DashboardPage() {
-  const [summary, setSummary] = useState<EquipmentSummary>(FALLBACK_SUMMARY);
-  const [equipment, setEquipment] = useState<Equipment[]>(FALLBACK_EQUIP);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [vhsMeta, setVhsMeta] = useState<VhsTrendMeta | null>(null);
-  const [selected, setSelected] = useState<Equipment | null>(FALLBACK_EQUIP[0]);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerEquipment, setDrawerEquipment] = useState<Equipment | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(new Date());
-  const selectedIdRef = useRef<string | null>(FALLBACK_EQUIP[0]?.id ?? null);
+  const [summary,        setSummary]        = useState<EquipmentSummary>(FALLBACK_SUMMARY);
+  const [equipment,      setEquipment]      = useState<Equipment[]>(FALLBACK_EQUIP);
+  const [alerts,         setAlerts]         = useState<Alert[]>([]);
+  const [vhsMeta,        setVhsMeta]        = useState<VhsTrendMeta | null>(null);
+  const [selected,       setSelected]       = useState<Equipment | null>(null);
+  const [drawerOpen,     setDrawerOpen]     = useState(false);
+  const [drawerEquip,    setDrawerEquip]    = useState<Equipment | null>(null);
+  const [loading,        setLoading]        = useState(false);
+  const [lastUpdate,     setLastUpdate]     = useState(new Date());
+  const selectedIdRef = useRef<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -113,320 +156,233 @@ export default function DashboardPage() {
         dashboardApi.getEquipment(),
         dashboardApi.getAlerts(),
       ]);
-
       setSummary(sumRes.data as EquipmentSummary);
-      setEquipment(eqRes.data as Equipment[]);
       setAlerts(alertRes.data as Alert[]);
+      const eq = eqRes.data as Equipment[];
+      setEquipment(eq);
       setLastUpdate(new Date());
-
-      const equipmentData = eqRes.data as Equipment[];
-      const nextSelected =
-        equipmentData.find((item: Equipment) => item.id === selectedIdRef.current) ??
-        equipmentData[0] ?? null;
-
-      setSelected(nextSelected);
-      selectedIdRef.current = nextSelected?.id ?? null;
-
-      if (nextSelected) {
-        const vhs = await dashboardApi.getVhsTrend(nextSelected.id);
+      const next = eq.find(i => i.id === selectedIdRef.current) ?? eq[0] ?? null;
+      setSelected(next);
+      selectedIdRef.current = next?.id ?? null;
+      if (next) {
+        const vhs = await dashboardApi.getVhsTrend(next.id);
         setVhsMeta(vhs.data as VhsTrendMeta);
       }
-    } catch {
-      /* 後端未就緒時保留 fallback */
-    } finally {
+    } catch { /* keep fallback */ } finally {
       setLoading(false);
     }
   }, []);
 
   const fetchAlerts = useCallback(async () => {
-    try {
-      const res = await dashboardApi.getAlerts();
-      setAlerts(res.data as Alert[]);
-    } catch {
-      /* 保留目前清單 */
-    }
+    try { setAlerts((await dashboardApi.getAlerts()).data as Alert[]); } catch { /* keep */ }
   }, []);
 
-  const handleResolveAlert = async (alertId: string) => {
-    await dashboardApi.resolveAlert(alertId);
-    await fetchAlerts();
+  const fetchVhs = async (id: string) => {
+    try { setVhsMeta((await dashboardApi.getVhsTrend(id)).data as VhsTrendMeta); } catch { /* keep */ }
   };
 
-  const handleDeleteAlert = async (alertId: string) => {
-    await dashboardApi.deleteAlert(alertId);
-    await fetchAlerts();
-  };
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleCreateAlert = async (payload: {
-    equipment_id: string;
-    equipment_name: string;
-    level: string;
-    message: string;
-  }) => {
-    await dashboardApi.createAlert(payload);
-    await fetchAlerts();
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const fetchVhsTrend = async (equipmentId: string) => {
-    try {
-      const vhs = await dashboardApi.getVhsTrend(equipmentId);
-      setVhsMeta(vhs.data as VhsTrendMeta);
-    } catch {
-      /* 保留目前趨勢 */
-    }
-  };
-
-  const handleSelectEquipment = async (item: Equipment) => {
+  const handleSelect = async (item: Equipment) => {
     setSelected(item);
     selectedIdRef.current = item.id;
-    await fetchVhsTrend(item.id);
+    await fetchVhs(item.id);
+  };
+  const handleDetail = (item: Equipment) => { setDrawerEquip(item); setDrawerOpen(true); };
+  const handleResolve = async (id: string) => { await dashboardApi.resolveAlert(id); await fetchAlerts(); };
+  const handleDelete  = async (id: string) => { await dashboardApi.deleteAlert(id);  await fetchAlerts(); };
+  const handleCreate  = async (p: { equipment_id: string; equipment_name: string; level: string; message: string }) => {
+    await dashboardApi.createAlert(p);
+    await fetchAlerts();
   };
 
-  const handleOpenDetail = (item: Equipment) => {
-    setDrawerEquipment(item);
-    setDrawerOpen(true);
-  };
-
-  const totalAlerts = alerts.filter((alert) => !alert.resolved).length;
-  const actionGuide = getActionGuide(selected);
+  const unresolved = alerts.filter(a => !a.resolved).length;
+  const guide      = getGuide(selected);
+  const selCfg     = S[(selected?.status as StatusKey) ?? "normal"] ?? S.normal;
 
   return (
-    <div className="space-y-6 pb-2">
+    <>
       <EquipmentDetailDrawer
-        equipment={drawerEquipment}
+        equipment={drawerEquip}
         alerts={alerts}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        onCreateAlert={handleCreateAlert}
-        onResolve={handleResolveAlert}
+        onCreateAlert={handleCreate}
+        onResolve={handleResolve}
       />
-      <section className="panel-grid overflow-hidden rounded-[32px] p-6 sm:p-7 lg:p-8">
-        <div className="relative z-10 grid gap-6 xl:grid-cols-[1.35fr_0.9fr]">
-          <div>
-            <div className="section-kicker">Operations Snapshot</div>
-            <h1 className="display-title mt-4 text-3xl leading-tight sm:text-[42px]">
-              製造設備維護戰情中心
-            </h1>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
-              將巡檢影像、邊緣推論與維護輸出整合成同一個判斷畫面，
-              讓現場技術人員可以在幾秒內掌握異常級別與下一步行動。
-            </p>
 
-            <div className="mt-6 flex flex-wrap gap-2">
-              <span className="signal-chip">
-                <Cpu className="h-3.5 w-3.5 text-accent-300" />
-                NVIDIA Jetson Series
-              </span>
-              <span className="signal-chip">
-                <Camera className="h-3.5 w-3.5 text-brand-300" />
-                RealSense + WebRTC 多源輸入
-              </span>
-              <span className="signal-chip">
-                <Waves className="h-3.5 w-3.5 text-emerald-300" />
-                3-5 秒推論節奏
-              </span>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <MetricBlock
-              label="未解決事件"
-              value={`${totalAlerts}`}
-              detail="依風險排序的即時異常清單"
-            />
-            <MetricBlock
-              label="危急設備"
-              value={`${summary.critical}`}
-              detail="需優先停機或現場複檢"
-            />
-            <MetricBlock
-              label="平均健康分數"
-              value={`${averageVhs(equipment).toFixed(1)}`}
-              detail="全場設備 VHS 綜合視角"
-            />
-            <MetricBlock
-              label="最後同步"
-              value={lastUpdate.toLocaleTimeString("zh-TW", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-              detail="可隨時手動刷新資料"
-            />
-          </div>
+      {/*
+       * ┌─ 1. HEADER BAR ─────────────────────────────────────────────────┐
+       */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/8 bg-slate-900/60 px-4 py-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-sm font-semibold text-white">製造設備維護戰情中心</h1>
+          <span className="signal-chip"><Cpu  className="h-3 w-3 text-accent-300" />NVIDIA Jetson</span>
+          <span className="signal-chip"><Camera className="h-3 w-3 text-brand-300" />WebRTC</span>
+          <span className="signal-chip"><Waves  className="h-3 w-3 text-emerald-300" />3–5s 推論</span>
         </div>
-      </section>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] text-slate-500">
+            {lastUpdate.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })} 同步
+          </span>
+          <button onClick={fetchData} disabled={loading} className="secondary-button py-1.5 text-xs">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            重新整理
+          </button>
+        </div>
+      </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="設備總數"
-          value={summary.total}
-          detail="目前納管中的設備節點總數"
-          icon={Gauge}
-        />
-        <StatCard
-          title="穩定運作"
-          value={summary.normal}
-          detail="VHS 維持在 70 分以上"
-          icon={Sparkles}
-        />
-        <StatCard
-          title="警戒中"
-          value={summary.warning}
-          detail="需要安排本日或本週維護"
-          icon={AlertTriangle}
-        />
-        <StatCard
-          title="危急 / 離線"
-          value={`${summary.critical} / ${summary.offline}`}
-          detail="需立即檢查設備或通訊狀態"
-          icon={ShieldAlert}
-        />
-      </section>
+      {/*
+       * ┌─ 2. KPI ROW ────────────────────────────────────────────────────┐
+       */}
+      <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
+        <KpiChip label="設備總數"   value={summary.total}    sub="納管節點"       color="text-slate-400" />
+        <KpiChip label="穩定運作"   value={summary.normal}   sub="VHS ≥ 70"      color="text-emerald-400" />
+        <KpiChip label="警戒中"     value={summary.warning}  sub="待排維護"       color="text-amber-400" />
+        <KpiChip label="危急"       value={summary.critical} sub="立即停機"       color="text-rose-400" />
+        <KpiChip label="未解決事件" value={unresolved}       sub="依風險排序"     color="text-brand-300" />
+        <KpiChip label="平均 VHS"   value={averageVhs(equipment).toFixed(1)} sub="全場均值" color="text-accent-300" />
+      </div>
 
-      <section className="grid gap-6 xl:grid-cols-[1.45fr_0.95fr]">
-        <div className="panel-soft rounded-[32px] p-5 sm:p-6">
-          <div className="flex flex-col gap-4 border-b border-white/8 pb-5 sm:flex-row sm:items-end sm:justify-between">
+      {/*
+       * ┌─ 3. MAIN GRID ──────────────────────────────────────────────────┐
+       *   Left: equipment list  |  Right: asset detail + alerts
+       */}
+      <div className="mb-3 grid gap-3 lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_360px]">
+
+        {/* LEFT — Equipment board */}
+        <div className="panel-soft flex flex-col rounded-2xl p-3">
+          {/* Board header */}
+          <div className="mb-3 flex items-center justify-between gap-2 border-b border-white/8 pb-3">
             <div>
-              <div className="section-kicker">Equipment Board</div>
-              <h2 className="mt-3 text-2xl font-semibold text-white">受監控設備</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                依設備健康狀態切換詳情，快速定位高風險節點與維保優先順序。
-              </p>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Equipment Board</p>
+              <h2 className="mt-0.5 text-sm font-semibold text-white">受監控設備</h2>
             </div>
-
-            <button
-              onClick={fetchData}
-              disabled={loading}
-              className="secondary-button"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              重新整理資料
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Status legend */}
+              <span className="hidden items-center gap-1.5 text-[10px] text-slate-500 sm:flex">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />穩定
+                <span className="ml-1 h-1.5 w-1.5 rounded-full bg-amber-400" />警戒
+                <span className="ml-1 h-1.5 w-1.5 rounded-full bg-rose-400" />危急
+                <span className="ml-1 h-1.5 w-1.5 rounded-full bg-slate-500" />離線
+              </span>
+              <span className="text-[11px] text-slate-500">{equipment.length} 台</span>
+            </div>
           </div>
 
-          <div className="mt-5 grid gap-4 lg:grid-cols-2">
-            {equipment.map((item) => (
-              <EquipmentCard
-                key={item.id}
-                equipment={item}
-                active={selected?.id === item.id}
-                onClick={() => handleSelectEquipment(item)}
-                onOpenDetail={() => handleOpenDetail(item)}
-              />
-            ))}
+          {/* Equipment rows — scrollable */}
+          <div className="flex flex-col gap-1.5 overflow-y-auto lg:max-h-[420px] xl:max-h-[460px]">
+            {equipment.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Gauge className="h-8 w-8 text-slate-600" />
+                <p className="mt-3 text-sm text-slate-500">後端連接中，請稍候…</p>
+              </div>
+            ) : (
+              equipment.map((item) => (
+                <EquipRow
+                  key={item.id}
+                  item={item}
+                  active={selected?.id === item.id}
+                  onClick={() => handleSelect(item)}
+                  onDetail={() => handleDetail(item)}
+                />
+              ))
+            )}
           </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="panel-soft rounded-[32px] p-5 sm:p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="section-kicker">Selected Asset</div>
-                <h2 className="mt-3 text-2xl font-semibold text-white">
+        {/* RIGHT — Selected asset + Anomaly feed */}
+        <div className="flex flex-col gap-3">
+
+          {/* Asset detail card */}
+          <div className="panel-soft rounded-2xl p-3">
+            {/* Header row */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Selected Asset</p>
+                <h2 className="mt-0.5 truncate text-sm font-semibold text-white">
                   {selected?.name ?? "尚未選擇設備"}
                 </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  {selected?.location ?? "請從左側設備卡切換查看詳情。"}
+                <p className="truncate text-[11px] text-slate-500">
+                  {selected?.location ?? "點選左側設備列查看詳情"}
                 </p>
               </div>
-              <div className="rounded-[24px] border border-white/8 bg-slate-950/35 px-4 py-3 text-right">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">VHS</p>
-                <p className="font-display text-4xl font-semibold text-white">
-                  {selected?.vhs_score?.toFixed(1) ?? "--"}
+              {/* VHS badge */}
+              <div className="shrink-0 rounded-xl border border-white/8 bg-slate-950/35 px-3 py-2 text-center">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">VHS</p>
+                <p className="font-display text-xl font-semibold text-white">
+                  {selected?.vhs_score?.toFixed(1) ?? "—"}
                 </p>
+                {selected && (
+                  <span className={`${selCfg.pill} mt-1 !px-1.5 !py-0 !text-[9px]`}>{selCfg.label}</span>
+                )}
               </div>
             </div>
 
-            <div className="mt-5 rounded-[26px] border border-white/8 bg-white/[0.035] p-4">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">優先建議</p>
-              <p className="mt-2 text-lg font-semibold text-white">{actionGuide.title}</p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">{actionGuide.summary}</p>
-              <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/8 bg-slate-950/35 px-3 py-3">
-                <span className="text-sm font-medium text-white">{actionGuide.nextStep}</span>
-                <ArrowRight className="h-4 w-4 text-brand-300" />
+            {/* VHS progress bar */}
+            {selected && (
+              <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/8">
+                <div
+                  className={`h-full rounded-full bg-gradient-to-r ${selCfg.bar} transition-all duration-500`}
+                  style={{ width: `${Math.max(0, Math.min(100, selected.vhs_score ?? 0))}%` }}
+                />
+              </div>
+            )}
+
+            {/* Action guide */}
+            <div className="mt-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">優先建議</p>
+              <p className="mt-1 text-sm font-semibold text-white">{guide.title}</p>
+              <p className="mt-1 text-[12px] leading-5 text-slate-400">{guide.body}</p>
+              <div className="mt-2 flex items-center justify-between rounded-lg border border-white/8 bg-slate-950/30 px-2.5 py-1.5">
+                <span className="text-[12px] font-medium text-white">{guide.next}</span>
+                <ArrowRight className="h-3.5 w-3.5 text-brand-300" />
               </div>
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <CompactMetric label="設備型別" value={selected?.type ?? "--"} />
-              <CompactMetric
-                label="活躍警報"
-                value={selected ? `${selected.active_alerts}` : "--"}
-              />
-              <CompactMetric
-                label="最後巡檢"
-                value={
-                  selected?.last_inspection
-                    ? new Date(selected.last_inspection).toLocaleTimeString("zh-TW", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "--"
-                }
-              />
+            {/* 3 prop cells */}
+            <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+              {[
+                { label: "設備型別", value: selected?.type ?? "—" },
+                { label: "活躍警報", value: selected ? `${selected.active_alerts}` : "—" },
+                {
+                  label: "最後巡檢",
+                  value: selected?.last_inspection
+                    ? new Date(selected.last_inspection).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })
+                    : "—",
+                },
+              ].map(({ label, value }) => (
+                <div key={label} className="rounded-xl border border-white/8 bg-slate-950/25 px-2 py-2">
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-slate-500">{label}</p>
+                  <p className="mt-0.5 truncate text-xs font-medium text-white">{value}</p>
+                </div>
+              ))}
             </div>
           </div>
 
-          <AnomalyFeed
-            alerts={alerts}
-            onResolve={handleResolveAlert}
-            onDelete={handleDeleteAlert}
-          />
+          {/* Anomaly feed — scrollable */}
+          <div className="min-h-0 flex-1 overflow-y-auto lg:max-h-[280px] xl:max-h-[300px]">
+            <AnomalyFeed
+              alerts={alerts}
+              onResolve={handleResolve}
+              onDelete={handleDelete}
+            />
+          </div>
         </div>
-      </section>
+      </div>
 
-      <section className="grid gap-6 xl:grid-cols-[1.28fr_0.72fr]">
+      {/*
+       * ┌─ 4. BOTTOM ROW — VHS Chart + Pipeline ──────────────────────────┐
+       */}
+      <div className="grid gap-3 lg:grid-cols-[1fr_280px] xl:grid-cols-[1fr_300px]">
         <VhsChart
           meta={vhsMeta}
           equipmentId={selected?.id ?? ""}
           equipmentName={selected?.name ?? ""}
-          onRecorded={() => selected && fetchVhsTrend(selected.id)}
+          onRecorded={() => selected && fetchVhs(selected.id)}
         />
-
         <PipelineFlow />
-      </section>
-    </div>
+      </div>
+    </>
   );
-}
-
-function MetricBlock({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-[26px] border border-white/10 bg-white/[0.04] p-5">
-      <p className="text-xs uppercase tracking-[0.22em] text-slate-500">{label}</p>
-      <p className="mt-3 font-display text-3xl font-semibold text-white">{value}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-400">{detail}</p>
-    </div>
-  );
-}
-
-function CompactMetric({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-[22px] border border-white/8 bg-slate-950/30 px-4 py-4">
-      <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">{label}</p>
-      <p className="mt-2 text-base font-medium text-white">{value}</p>
-    </div>
-  );
-}
-
-function averageVhs(list: Equipment[]) {
-  if (list.length === 0) return 0;
-  return list.reduce((sum, item) => sum + (item.vhs_score ?? 0), 0) / list.length;
 }
